@@ -802,31 +802,13 @@ class Procurement(Base):
     company = relationship("Company", back_populates="procurements")
     country = relationship("Country", back_populates="procurements")
 
-
-# ========== TRANSACTION MODELS ==========
-class PendingTransaction(Base, CompanyMixin):
-    __tablename__ = "pending_transactions"
-
-    id = Column(Integer, primary_key=True, index=True)
-    transaction_type = Column(SAEnum(TransactionType), nullable=False)
-    msisdn = Column(String(20), nullable=False)
-    amount = Column(Numeric(14, 2), nullable=False)
-    partner_code = Column(String(100), nullable=False)
-    country_iso = Column(String(3), nullable=True)  # For routing
-    status = Column(SAEnum(PendingStatus), default=PendingStatus.PENDING)
-    error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    processed_at = Column(DateTime(timezone=True), nullable=True)
-
-
 # ========== BASE (ABSTRACT) TRANSACTION ==========
-class BaseTransaction(Base):
-    """Abstract base class with common fields"""
-    __abstract__ = True
+
+class TransactionMixin:
+    """Mixin class with common fields for all transactions"""
     
+    # Common fields
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Core fields
     amount = Column(Numeric(14, 2), nullable=False)
     msisdn = Column(String(20), nullable=False)
     status = Column(String(20), default='initiated')
@@ -843,11 +825,20 @@ class BaseTransaction(Base):
     
     # Gateway fields
     gateway_response = Column(Text, nullable=True)
+    gateway_transaction_id = Column(String(100), nullable=True)
     sim_used = Column(String(20), nullable=True)
+    
+    # Fees and amounts
+    fee_amount = Column(Numeric(10, 2), default=0)
+    net_amount = Column(Numeric(10, 2), nullable=False)
     
     # Balance tracking
     before_balance = Column(Numeric(14, 2), nullable=True)
     after_balance = Column(Numeric(14, 2), nullable=True)
+    
+    # Email confirmation
+    email_confirmation_token = Column(String(64), nullable=True, unique=True)
+    email_confirmed_at = Column(DateTime(timezone=True), nullable=True)
     
     # Technical fields
     error_message = Column(Text, nullable=True)
@@ -857,31 +848,58 @@ class BaseTransaction(Base):
     validated_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships (will be inherited)
-    company = relationship("Company")
-    country = relationship("Country")
-    balance = relationship("CompanyCountryBalance")
-    pending_transaction = relationship("PendingTransaction")
-
-    # Property to get the right field name based on transaction type
-    @property
-    def recipient(self):
-        return self.msisdn if self.transaction_type in ["deposit", "airtime"] else None
+    # Relationships using @declared_attr for mixins
+    @declared_attr
+    def company(cls):
+        return relationship("Company")
     
-    @property
-    def sender(self):
-        return self.msisdn if self.transaction_type == "withdrawal" else None
+    @declared_attr
+    def country(cls):
+        return relationship("Country")
+    
+    @declared_attr
+    def balance(cls):
+        return relationship("CompanyCountryBalance")
+    
+    @declared_attr
+    def pending_transaction(cls):
+        return relationship("PendingTransaction")
 
 
 # ========== SPECIFIC TRANSACTION MODELS ==========
-class DepositTransaction(BaseTransaction):
+class DepositTransaction(Base, TransactionMixin):
     __tablename__ = "deposit_transactions"
     
+    recipient = Column(String(20), nullable=False)
 
-class WithdrawalTransaction(BaseTransaction):
+
+class WithdrawalTransaction(Base, TransactionMixin):
     __tablename__ = "withdrawal_transactions"
     
+    sender = Column(String(20), nullable=False)
 
-class AirtimePurchase(BaseTransaction):
+
+class AirtimePurchase(Base, TransactionMixin):
     __tablename__ = "airtime_purchases"
     
+    recipient = Column(String(20), nullable=False)
+
+
+# ========== PENDING TRANSACTION ==========
+class PendingTransaction(Base):
+    __tablename__ = "pending_transactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    transaction_type = Column(String(20), nullable=False)  # deposit, withdrawal, airtime
+    msisdn = Column(String(20), nullable=False)
+    amount = Column(Numeric(14, 2), nullable=False)
+    partner_code = Column(String(100), nullable=False)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    country_iso = Column(String(3), nullable=True)
+    status = Column(String(20), default="pending")
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    company = relationship("Company")
