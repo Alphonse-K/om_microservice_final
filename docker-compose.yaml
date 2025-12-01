@@ -13,6 +13,8 @@ services:
     volumes:
       - ./src:/app/src
       - ./credentials:/app/credentials
+      - ./alembic.ini:/app/alembic.ini
+      - ./alembic:/app/alembic
 
   db:
     image: postgres:15
