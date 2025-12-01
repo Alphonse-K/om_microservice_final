@@ -85,17 +85,26 @@
 
 
 # src/tasks/transaction_queue.py
+import logging
 from decimal import Decimal
 from src.worker_app import celery_app
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from src.core.database import SessionLocal
-from src.models.transaction import PendingTransaction, CompanyCountryBalance, FeeConfig, Country
+from src.models.transaction import PendingTransaction, CompanyCountryBalance, FeeConfig, Country, Company
 from src.models.transaction import DepositTransaction, WithdrawalTransaction, AirtimePurchase
 from src.services.neogate_client import NeoGateTG400Client
 
 om_client = NeoGateTG400Client()
 MAX_REQUESTS_PER_MINUTE = 6
+
+logger = logging.getLogger("transaction_queue")
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 class BalanceManager:
     @staticmethod
@@ -213,7 +222,7 @@ class CountryRouter:
     
 
 @celery_app.task(bind=True, max_retries=3, name='src.tasks.transaction_queue.process_transaction_queue')
-def process_transaction_queue():
+def process_transaction_queue(self):
     """Process transactions but keep them as INITIATED until email confirmation"""
     db: Session = SessionLocal()
     balance_manager = BalanceManager()
@@ -232,15 +241,28 @@ def process_transaction_queue():
         for req in pending_requests:
             transaction = None
             try:
+                # Use the company_id from the pending transaction
+                company_id = req.company_id
+                
+                # Validate company exists and is active
+                company = db.query(Company).filter(
+                    Company.id == company_id,
+                    Company.is_active == True
+                ).first()
+                
+                if not company:
+                    raise Exception(f"Company {company_id} not found or inactive")
+                
                 req.status = "processing"
                 db.commit()
 
-                # Determine destination country from request (you'll need to add country_iso to PendingTransaction)
+                # Determine destination country
                 destination_country_id = country_router.get_destination_country(db, req.country_iso)
                 
-                # Get company balance for this country
-                company_id = 1  # This should come from your request context
+                if not destination_country_id:
+                    raise Exception(f"Could not determine destination country for ISO: {req.country_iso}")
                 
+                # Get company balance for this country
                 balance = db.query(CompanyCountryBalance).filter(
                     CompanyCountryBalance.company_id == company_id,
                     CompanyCountryBalance.country_id == destination_country_id
@@ -249,72 +271,119 @@ def process_transaction_queue():
                 if not balance:
                     raise Exception(f"No balance configured for company {company_id} in country {destination_country_id}")
 
+                # Check if balance is sufficient
+                if balance.available_balance < Decimal(str(req.amount)):
+                    raise Exception(f"Insufficient balance. Available: {balance.available_balance}, Required: {req.amount}")
+
                 # Convert amount to Decimal
                 amount = Decimal(str(req.amount))
                 
                 # Calculate fees and net amount
-                fee_info = fee_calculator.calculate_fee(db, destination_country_id, destination_country_id, amount)
+                fee_info = fee_calculator.calculate_fee(
+                    db, 
+                    company_id,  # Pass company_id for company-specific fees
+                    destination_country_id, 
+                    amount, 
+                    req.transaction_type
+                )
                 
                 # Hold balance for the transaction
-                held_balance = balance_manager.hold_balance(db, company_id, destination_country_id, amount)
+                held_balance = balance_manager.hold_balance(
+                    db, 
+                    company_id, 
+                    destination_country_id, 
+                    amount
+                )
                 
-                # Create transaction record WITHOUT balance tracking initially
+                if not held_balance:
+                    raise Exception("Failed to hold balance for transaction")
+                
+                # Create transaction record
                 tx_data = {
+                    "company_id": company_id,  # Include company_id in transaction
                     "amount": amount,
                     "msisdn": req.msisdn,
                     "destination_country_id": destination_country_id,
                     "destination_balance_id": balance.id,
                     "partner_code": req.partner_code,
                     "transaction_type": req.transaction_type,
-                    "status": "initiated",  # Will be confirmed by email confirmation task
+                    "status": "initiated",
                     "fee_amount": fee_info["fee_amount"],
-                    # NO before_balance or after_balance here - only set on success
+                    "net_amount": fee_info["net_amount"],
+                    "pending_transaction_id": req.id,  # Link back to pending transaction
                 }
 
+                # Create specific transaction type
                 if req.transaction_type == "airtime":
-                    tx = AirtimePurchase(
+                    transaction = AirtimePurchase(
                         recipient=req.msisdn,
                         **tx_data
                     )
                     response = om_client.purchase_credit(req.msisdn, float(amount))
 
                 elif req.transaction_type == "deposit":
-                    tx = DepositTransaction(
+                    transaction = DepositTransaction(
                         recipient=req.msisdn,
                         **tx_data
                     )
                     response = om_client.send_deposit_with_confirmation(req.msisdn, float(amount))
 
                 elif req.transaction_type == "withdrawal":
-                    tx = WithdrawalTransaction(
+                    transaction = WithdrawalTransaction(
                         sender=req.msisdn,
                         **tx_data
                     )
                     response = om_client.withdraw_cash(req.msisdn, float(fee_info["net_amount"]))
 
-                # Store gateway response but don't confirm yet
-                tx.gateway_response = response.get("response") or str(response)
-                                
-                db.add(tx)
-                db.commit()
-                db.refresh(tx)
+                else:
+                    raise Exception(f"Unknown transaction type: {req.transaction_type}")
+
+                # Store gateway response
+                transaction.gateway_response = response.get("response") or str(response)
+                transaction.gateway_transaction_id = response.get("transaction_id")
                 
-                req.status = "processing"  # Changed from "pending" to "done" since processing completed
+                db.add(transaction)
+                db.commit()
+                db.refresh(transaction)
+                
+                # Update pending request status
+                req.status = "processed"
+                req.processed_at = datetime.now(timezone.utc)
                 db.commit()
 
+                # Schedule email confirmation task
+                if transaction:
+                    send_transaction_confirmation_email.delay(transaction.id)
+
             except Exception as e:
-                # If transaction was created but failed, release held balance
-                if transaction and transaction.destination_balance_id:
-                    try:
-                        balance_manager.release_balance(db, transaction.destination_balance_id, Decimal(str(req.amount)), success=False)
-                    except:
-                        pass
+                logger.error(f"Failed to process pending transaction {req.id}: {str(e)}")
                 
+                # Release held balance if it was held
+                if 'held_balance' in locals() and held_balance:
+                    try:
+                        balance_manager.release_balance(
+                            db, 
+                            company_id, 
+                            destination_country_id, 
+                            amount
+                        )
+                    except Exception as balance_error:
+                        logger.error(f"Failed to release balance for failed transaction {req.id}: {str(balance_error)}")
+                
+                # Update status to failed
                 req.status = "failed"
+                req.error_message = str(e)[:500]  # Truncate if too long
+                
                 if transaction:
                     transaction.status = "failed"
                     transaction.error_message = str(e)
+                
                 db.commit()
 
+    except Exception as e:
+        logger.error(f"Transaction queue processing failed: {str(e)}")
+        # Retry the entire task if something went wrong
+        self.retry(countdown=60)
+    
     finally:
         db.close()

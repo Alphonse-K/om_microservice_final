@@ -263,6 +263,34 @@ class Transaction(Base):
     country = relationship("Country", back_populates="transactions")
     balance = relationship("CompanyCountryBalance")  # Changed from balance_record
 
+
+class Transaction(Base):
+    __abstract__ = True
+    
+    id = Column(Integer, primary_key=True, index=True)
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)  # Add this
+    pending_transaction_id = Column(Integer, ForeignKey("pending_transactions.id"), nullable=True)  # Add this
+    amount = Column(Numeric(10, 2), nullable=False)
+    msisdn = Column(String(20), nullable=False)
+    destination_country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
+    destination_balance_id = Column(Integer, ForeignKey("company_country_balances.id"), nullable=False)
+    partner_code = Column(String(50), nullable=False)
+    transaction_type = Column(String(20), nullable=False)
+    status = Column(String(20), default="initiated")
+    fee_amount = Column(Numeric(10, 2), default=0)
+    net_amount = Column(Numeric(10, 2), nullable=False)
+    gateway_response = Column(Text)
+    gateway_transaction_id = Column(String(100))
+    error_message = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    company = relationship("Company")
+    destination_country = relationship("Country")
+    destination_balance = relationship("CompanyCountryBalance")
+    pending_transaction = relationship("PendingTransaction")  # Add this
+
     # Property to get the right field name based on transaction type
     @property
     def recipient(self):
@@ -299,10 +327,12 @@ class PendingTransaction(Base):
     msisdn = Column(String(20), nullable=False)
     amount = Column(Numeric(14, 2), nullable=False)  # Changed to 14,2
     partner_code = Column(String(100), nullable=False)  # Changed from partner_id
-
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     status = Column(SAEnum(PendingStatus), default=PendingStatus.PENDING)  # Added enum
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    
+    # Relationships
+    company = relationship("Company")
 
 class Country(Base):
     __tablename__ = "countries"  # Changed to plural
