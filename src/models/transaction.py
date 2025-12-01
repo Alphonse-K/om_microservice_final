@@ -222,46 +222,46 @@ class TransactionType(str, Enum):
     AIRTIME = "airtime"
 
 
-class Transaction(Base):
-    __tablename__ = "transactions"
+# class Transaction(Base):
+#     __tablename__ = "transactions"
 
-    id = Column(Integer, primary_key=True, index=True)
+#     id = Column(Integer, primary_key=True, index=True)
     
-    # Core transaction fields
-    transaction_type = Column(String(20), nullable=False)  # deposit|withdrawal|airtime
-    amount = Column(Numeric(14, 2), nullable=False)
-    msisdn = Column(String(20), nullable=False)    
+#     # Core transaction fields
+#     transaction_type = Column(String(20), nullable=False)  # deposit|withdrawal|airtime
+#     amount = Column(Numeric(14, 2), nullable=False)
+#     msisdn = Column(String(20), nullable=False)    
     
-    # Status tracking
-    status = Column(SAEnum(TransactionStatus), default=TransactionStatus.INITIATED, nullable=False)
+#     # Status tracking
+#     status = Column(SAEnum(TransactionStatus), default=TransactionStatus.INITIATED, nullable=False)
     
-    # Foreign keys
-    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
-    country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
-    balance_id = Column(Integer, ForeignKey("company_country_balances.id"), nullable=True)
+#     # Foreign keys
+#     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+#     country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
+#     balance_id = Column(Integer, ForeignKey("company_country_balances.id"), nullable=True)
     
-    # Partner information - using partner_code instead of partner_id
-    partner_code = Column(String(100), nullable=False)
-    service_partner_id = Column(String(100), nullable=True)
+#     # Partner information - using partner_code instead of partner_id
+#     partner_code = Column(String(100), nullable=False)
+#     service_partner_id = Column(String(100), nullable=True)
     
-    # Gateway and technical fields
-    gateway_response = Column(Text, nullable=True)
-    sim_used = Column(String(20), nullable=True)
-    error_message = Column(Text, nullable=True)
+#     # Gateway and technical fields
+#     gateway_response = Column(Text, nullable=True)
+#     sim_used = Column(String(20), nullable=True)
+#     error_message = Column(Text, nullable=True)
     
-    # Balance tracking
-    before_balance = Column(Numeric(14, 2), nullable=True)
-    after_balance = Column(Numeric(14, 2), nullable=True)
+#     # Balance tracking
+#     before_balance = Column(Numeric(14, 2), nullable=True)
+#     after_balance = Column(Numeric(14, 2), nullable=True)
     
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    validated_at = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+#     # Timestamps
+#     created_at = Column(DateTime(timezone=True), server_default=func.now())
+#     validated_at = Column(DateTime(timezone=True), nullable=True)
+#     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationships
-    company = relationship("Company", back_populates="transactions")
-    country = relationship("Country", back_populates="transactions")
-    balance = relationship("CompanyCountryBalance")  # Changed from balance_record
+#     # Relationships
+#     company = relationship("Company", back_populates="transactions")
+#     country = relationship("Country", back_populates="transactions")
+#     balance = relationship("CompanyCountryBalance")  # Changed from balance_record
 
 
 class Transaction(Base):
@@ -330,7 +330,7 @@ class PendingTransaction(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     status = Column(SAEnum(PendingStatus), default=PendingStatus.PENDING)  # Added enum
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationships
     company = relationship("Company")
 
