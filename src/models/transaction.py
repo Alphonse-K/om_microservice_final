@@ -802,15 +802,71 @@ class Procurement(Base):
     company = relationship("Company", back_populates="procurements")
     country = relationship("Country", back_populates="procurements")
 
-# ========== BASE (ABSTRACT) TRANSACTION ==========
 
-class TransactionMixin:
-    """Mixin class with common fields for all transactions"""
+# ========== DEPOSIT TRANSACTION ==========
+class DepositTransaction(Base):
+    __tablename__ = "deposit_transactions"
     
-    # Common fields
+    # Primary key
     id = Column(Integer, primary_key=True, index=True)
+    
+    # Transaction details
     amount = Column(Numeric(14, 2), nullable=False)
-    msisdn = Column(String(20), nullable=False)
+    recipient = Column(String(20), nullable=False)
+    status = Column(String(20), default='initiated')
+    
+    # Foreign keys
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
+    balance_id = Column(Integer, ForeignKey("company_country_balances.id"), nullable=True)
+    pending_transaction_id = Column(Integer, ForeignKey("pending_transactions.id"), nullable=True)
+    
+    # Partner info
+    partner_code = Column(String(100), nullable=False)
+    service_partner_id = Column(String(100), nullable=True)
+    
+    # Gateway fields
+    gateway_response = Column(Text, nullable=True)
+    gateway_transaction_id = Column(String(100), nullable=True)
+    sim_used = Column(String(20), nullable=True)
+    
+    # Fees and amounts
+    fee_amount = Column(Numeric(10, 2), default=0)
+    net_amount = Column(Numeric(10, 2), nullable=False)
+    
+    # Balance tracking
+    before_balance = Column(Numeric(14, 2), nullable=True)
+    after_balance = Column(Numeric(14, 2), nullable=True)
+    
+    # Email confirmation
+    email_confirmation_token = Column(String(64), nullable=True, unique=True)
+    email_confirmed_at = Column(DateTime(timezone=True), nullable=True)
+      
+    # Technical fields
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships - define them HERE, not in any base class
+    company = relationship("Company")
+    country = relationship("Country")
+    balance = relationship("CompanyCountryBalance")
+    pending_transaction = relationship("PendingTransaction")
+
+
+# ========== WITHDRAWAL TRANSACTION ==========
+class WithdrawalTransaction(Base):
+    __tablename__ = "withdrawal_transactions"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Transaction details
+    amount = Column(Numeric(14, 2), nullable=False)
+    sender = Column(String(20), nullable=False)
     status = Column(String(20), default='initiated')
     
     # Foreign keys
@@ -848,41 +904,61 @@ class TransactionMixin:
     validated_at = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships using @declared_attr for mixins
-    @declared_attr
-    def company(cls):
-        return relationship("Company")
-    
-    @declared_attr
-    def country(cls):
-        return relationship("Country")
-    
-    @declared_attr
-    def balance(cls):
-        return relationship("CompanyCountryBalance")
-    
-    @declared_attr
-    def pending_transaction(cls):
-        return relationship("PendingTransaction")
+    # Relationships - define them HERE
+    company = relationship("Company")
+    country = relationship("Country")
+    balance = relationship("CompanyCountryBalance")
+    pending_transaction = relationship("PendingTransaction")
 
 
-# ========== SPECIFIC TRANSACTION MODELS ==========
-class DepositTransaction(Base, TransactionMixin):
-    __tablename__ = "deposit_transactions"
-    
-    recipient = Column(String(20), nullable=False)
-
-
-class WithdrawalTransaction(Base, TransactionMixin):
-    __tablename__ = "withdrawal_transactions"
-    
-    sender = Column(String(20), nullable=False)
-
-
-class AirtimePurchase(Base, TransactionMixin):
+# ========== AIRTIME PURCHASE ==========
+class AirtimePurchase(Base):
     __tablename__ = "airtime_purchases"
     
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Transaction details
+    amount = Column(Numeric(14, 2), nullable=False)
     recipient = Column(String(20), nullable=False)
+    status = Column(String(20), default='initiated')
+    
+    # Foreign keys
+    company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
+    country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
+    balance_id = Column(Integer, ForeignKey("company_country_balances.id"), nullable=True)
+    pending_transaction_id = Column(Integer, ForeignKey("pending_transactions.id"), nullable=True)
+    
+    # Partner info
+    partner_code = Column(String(100), nullable=False)
+    service_partner_id = Column(String(100), nullable=True)
+    
+    # Gateway fields
+    gateway_response = Column(Text, nullable=True)
+    gateway_transaction_id = Column(String(100), nullable=True)
+    sim_used = Column(String(20), nullable=True)
+    
+    # Fees and amounts
+    fee_amount = Column(Numeric(10, 2), default=0)
+    net_amount = Column(Numeric(10, 2), nullable=False)
+    
+    # Balance tracking
+    before_balance = Column(Numeric(14, 2), nullable=True)
+    after_balance = Column(Numeric(14, 2), nullable=True)
+            
+    # Technical fields
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    validated_at = Column(DateTime(timezone=True), nullable=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships - define them HERE
+    company = relationship("Company")
+    country = relationship("Country")
+    balance = relationship("CompanyCountryBalance")
+    pending_transaction = relationship("PendingTransaction")
 
 
 # ========== PENDING TRANSACTION ==========
@@ -890,7 +966,7 @@ class PendingTransaction(Base):
     __tablename__ = "pending_transactions"
     
     id = Column(Integer, primary_key=True, index=True)
-    transaction_type = Column(String(20), nullable=False)  # deposit, withdrawal, airtime
+    transaction_type = Column(String(20), nullable=False)
     msisdn = Column(String(20), nullable=False)
     amount = Column(Numeric(14, 2), nullable=False)
     partner_code = Column(String(100), nullable=False)
@@ -901,5 +977,5 @@ class PendingTransaction(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     processed_at = Column(DateTime(timezone=True), nullable=True)
     
-    # Relationships
+    # Relationship
     company = relationship("Company")

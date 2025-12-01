@@ -8,12 +8,10 @@ from datetime import datetime, timezone
 from src.core.database import SessionLocal
 from src.models.transaction import (
     PendingTransaction, CompanyCountryBalance, FeeConfig, 
-    Country, Company, PendingStatus, TransactionStatus, TransactionType,
+    Country, Company,
     DepositTransaction, WithdrawalTransaction, AirtimePurchase
 )
 from src.services.neogate_client import NeoGateTG400Client
-# If you have email confirmation tasks, uncomment this:
-# from src.tasks.email_tasks import send_transaction_confirmation_email
 
 om_client = NeoGateTG400Client()
 MAX_REQUESTS_PER_MINUTE = 6
@@ -28,8 +26,8 @@ logger.addHandler(handler)
 
 class BalanceManager:
     @staticmethod
-    def hold_balance(db: Session, company_id: int, country_id: int, amount: Decimal) -> CompanyCountryBalance:
-        """Hold balance for a transaction using Decimal"""
+    def hold_balance(db: Session, company_id: int, country_id: int, amount: Decimal):
+        """Hold balance for a transaction"""
         balance = db.query(CompanyCountryBalance).filter(
             CompanyCountryBalance.company_id == company_id,
             CompanyCountryBalance.country_id == country_id
@@ -39,9 +37,9 @@ class BalanceManager:
             raise Exception(f"No balance found for company {company_id} in country {country_id}")
         
         if balance.available_balance < amount:
-            raise Exception("Insufficient available balance")
+            raise Exception(f"Insufficient available balance. Available: {balance.available_balance}, Required: {amount}")
         
-        # Hold the funds using Decimal arithmetic
+        # Hold the funds
         balance.available_balance -= amount
         balance.held_balance += amount
         
@@ -49,8 +47,8 @@ class BalanceManager:
         return balance
 
     @staticmethod
-    def release_balance(db: Session, company_id: int, country_id: int, amount: Decimal, success: bool = True):
-        """Release held balance - either commit or rollback using Decimal"""
+    def release_balance(db: Session, company_id: int, country_id: int, amount: Decimal, success: bool = False):
+        """Release held balance - success=False means return to available"""
         balance = db.query(CompanyCountryBalance).filter(
             CompanyCountryBalance.company_id == company_id,
             CompanyCountryBalance.country_id == country_id
@@ -59,47 +57,35 @@ class BalanceManager:
         if not balance:
             return False
             
-        if success:
-            # Transaction succeeded - keep the held amount deducted
-            balance.held_balance -= amount
-        else:
-            # Transaction failed - return funds to available balance
-            balance.held_balance -= amount
+        # Reduce held balance
+        balance.held_balance -= amount
+        
+        # If transaction failed, return to available balance
+        if not success:
             balance.available_balance += amount
         
         db.commit()
         return True
 
-    @staticmethod
-    def record_balance_snapshot(db: Session, transaction, balance):
-        """Record before/after balance only for successful transactions"""
-        if transaction.status == "success":
-            transaction.before_balance = balance.available_balance + balance.held_balance + transaction.amount
-            transaction.after_balance = balance.available_balance + balance.held_balance
-            db.commit()
-
 
 class FeeCalculator:
     @staticmethod
-    def calculate_fee(db: Session, source_country_id: int, destination_country_id: int, amount: Decimal, transaction_type: str = None) -> dict:
-        """Calculate fees for a transaction corridor"""
+    def calculate_fee(db: Session, source_country_id: int, destination_country_id: int, amount: Decimal) -> dict:
+        """Calculate fees for a transaction"""
         
-        # Find fee configuration for this country pair
         fee_config = db.query(FeeConfig).filter(
             FeeConfig.source_country_id == source_country_id,
             FeeConfig.destination_country_id == destination_country_id,
             FeeConfig.is_active == True
         ).first()
         
-        # If no specific fee config, no fees apply
         if not fee_config:
             return {
                 "fee_amount": Decimal('0'), 
-                "net_amount": amount, 
-                "fee_config_used": None
+                "net_amount": amount
             }
         
-        # Calculate based on fee type
+        # Calculate fee
         if fee_config.fee_type == "flat":
             fee_amount = fee_config.flat_fee
         elif fee_config.fee_type == "percent":
@@ -109,47 +95,61 @@ class FeeCalculator:
         else:
             fee_amount = Decimal('0')
         
-        # Apply minimum fee protection
+        # Apply min/max
         if fee_config.min_fee and fee_amount < fee_config.min_fee:
             fee_amount = fee_config.min_fee
             
-        # Apply maximum fee cap  
         if fee_config.max_fee and fee_amount > fee_config.max_fee:
             fee_amount = fee_config.max_fee
         
-        # Final amount after fees
         net_amount = amount - fee_amount
         
         return {
             "fee_amount": fee_amount,
-            "net_amount": net_amount,
-            "fee_config_used": fee_config.id,
-            "fee_type": fee_config.fee_type
+            "net_amount": net_amount
         }
-    
+
 
 class CountryRouter:
     @staticmethod
-    def get_destination_country(db: Session, country_iso: str) -> int:
-        """Determine country from explicit ISO code - most reliable approach"""
-        
+    def get_destination_country(db: Session, country_iso: str):
+        """Get country by ISO code"""
         if not country_iso:
-            raise ValueError("Country ISO code is required")
-        
-        country = db.query(Country).filter(
+            return None
+            
+        return db.query(Country).filter(
             Country.iso_code == country_iso.upper(),
             Country.is_active == True
         ).first()
-        
-        if not country:
-            raise ValueError(f"Country with ISO code '{country_iso}' not found or inactive")
-        
-        return country.id
     
+    @staticmethod
+    def get_country_from_msisdn(db: Session, msisdn: str):
+        """Determine country from MSISDN"""
+        # Simple implementation - adjust based on your needs
+        clean_msisdn = msisdn.lstrip('+')
+        
+        # Country code mappings
+        country_codes = {
+            '221': 'SN',  # Senegal
+            '224': 'GN',  # Guinea
+            '223': 'ML',  # Mali
+            '225': 'CI',  # Ivory Coast
+            '226': 'BF',  # Burkina Faso
+        }
+        
+        for code, iso in country_codes.items():
+            if clean_msisdn.startswith(code):
+                return db.query(Country).filter(
+                    Country.iso_code == iso,
+                    Country.is_active == True
+                ).first()
+        
+        # Default to Senegal
+        return db.query(Country).filter(Country.iso_code == 'SN').first()
 
 @celery_app.task(bind=True, max_retries=3, name='src.tasks.transaction_queue.process_transaction_queue')
 def process_transaction_queue(self):
-    """Process transactions but keep them as INITIATED until email confirmation"""
+    """Process pending transactions"""
     db: Session = SessionLocal()
     balance_manager = BalanceManager()
     fee_calculator = FeeCalculator()
@@ -167,7 +167,7 @@ def process_transaction_queue(self):
         for req in pending_requests:
             transaction = None
             try:
-                # Update status to processing
+                # Update status
                 req.status = "processing"
                 db.commit()
 
@@ -175,140 +175,139 @@ def process_transaction_queue(self):
                 
                 # Determine destination country
                 destination_country = None
-                if hasattr(req, 'country_iso') and req.country_iso:
-                    destination_country = db.query(Country).filter(
-                        Country.iso_code == req.country_iso.upper(),
-                        Country.is_active == True
-                    ).first()
+                if req.country_iso:
+                    destination_country = country_router.get_destination_country(db, req.country_iso)
                 
                 if not destination_country:
-                    raise Exception(f"Could not determine destination country for MSISDN: {req.msisdn}")
+                    destination_country = country_router.get_country_from_msisdn(db, req.msisdn)
                 
-                # Get company balance for this country
+                if not destination_country:
+                    raise Exception(f"Could not determine country for MSISDN: {req.msisdn}")
+                
+                # Get company balance
                 balance = db.query(CompanyCountryBalance).filter(
                     CompanyCountryBalance.company_id == company_id,
                     CompanyCountryBalance.country_id == destination_country.id
                 ).first()
                 
                 if not balance:
-                    raise Exception(f"No balance configured for company {company_id} in country {destination_country.iso_code}")
+                    raise Exception(f"No balance for company {company_id} in {destination_country.iso_code}")
 
-                # Convert amount to Decimal
                 amount = Decimal(str(req.amount))
                 
-                # Calculate fees - using same country for source/destination for now
-                # You might want to track source country separately
+                # Calculate fees - for reconciliation only
                 fee_info = fee_calculator.calculate_fee(
                     db, 
-                    source_country_id=destination_country.id,  # Same for now
+                    source_country_id=destination_country.id,
                     destination_country_id=destination_country.id,
-                    amount=amount,
-                    transaction_type=req.transaction_type
+                    amount=amount
                 )
                 
-                # Check if balance is sufficient
+                # IMPORTANT: For ALL transaction types, we hold and send the FULL amount
+                # The fee is calculated for reconciliation but NOT deducted from the amount sent
+                
+                # Check if balance is sufficient for the FULL amount
                 if balance.available_balance < amount:
                     raise Exception(f"Insufficient balance. Available: {balance.available_balance}, Required: {amount}")
-
-                # Hold balance for the transaction
+                
+                # Hold the FULL amount (no fee deduction)
+                hold_amount = amount
+                
+                # Hold balance
                 held_balance = balance_manager.hold_balance(
                     db, 
                     company_id, 
                     destination_country.id, 
-                    amount
+                    hold_amount
                 )
                 
-                if not held_balance:
-                    raise Exception("Failed to hold balance for transaction")
-                
-                # Get current balance snapshot
+                # Get balance snapshot
                 before_balance = balance.available_balance + balance.held_balance
                 
-                # Create transaction data dict
+                # Common transaction data
                 tx_data = {
                     "company_id": company_id,
                     "pending_transaction_id": req.id,
-                    "amount": amount,
+                    "amount": amount,  # FULL amount
                     "msisdn": req.msisdn,
                     "country_id": destination_country.id,
                     "balance_id": balance.id,
                     "partner_code": req.partner_code,
                     "status": "initiated",
-                    "fee_amount": fee_info.get("fee_amount", Decimal('0')),
-                    "net_amount": fee_info.get("net_amount", amount),
+                    "fee_amount": fee_info["fee_amount"],  # For reconciliation only
+                    "net_amount": amount,  # Same as amount (no fee deduction for now)
                     "before_balance": before_balance,
-                    "after_balance": before_balance - amount,  # This will be updated on success
+                    "after_balance": before_balance - hold_amount,  # Based on FULL amount
                 }
                 
-                # Create specific transaction type based on your separate tables
+                # Create specific transaction type and call NeoGate with FULL amount
                 if req.transaction_type == "airtime":
                     transaction = AirtimePurchase(
                         recipient=req.msisdn,
                         **tx_data
                     )
-                    # Call Orange Money API for airtime purchase
+                    # Send FULL amount to NeoGate
                     response = om_client.purchase_credit(req.msisdn, float(amount))
+                    logger.info(f"Sending airtime: {amount} to {req.msisdn} (fee: {fee_info['fee_amount']} for reconciliation)")
 
                 elif req.transaction_type == "deposit":
                     transaction = DepositTransaction(
                         recipient=req.msisdn,
                         **tx_data
                     )
-                    # Call Orange Money API for deposit
+                    # Send FULL amount to NeoGate
                     response = om_client.send_deposit_with_confirmation(req.msisdn, float(amount))
+                    logger.info(f"Sending deposit: {amount} to {req.msisdn} (fee: {fee_info['fee_amount']} for reconciliation)")
 
                 elif req.transaction_type == "withdrawal":
                     transaction = WithdrawalTransaction(
                         sender=req.msisdn,
                         **tx_data
                     )
-                    # Call Orange Money API for withdrawal
+                    # For withdrawal: collect FULL amount from customer
+                    # IMPORTANT: The fee is OUR revenue, not deducted from customer
                     response = om_client.withdraw_cash(req.msisdn, float(amount))
+                    logger.info(f"Withdrawing: {amount} from {req.msisdn} (fee: {fee_info['fee_amount']} is our revenue)")
                 else:
                     raise Exception(f"Unknown transaction type: {req.transaction_type}")
                 
-                # Store gateway response
-                if response and isinstance(response, dict):
-                    transaction.gateway_response = response.get("response") or str(response)
-                elif response:
-                    transaction.gateway_response = str(response)
+                # Store response
+                if response:
+                    if isinstance(response, dict):
+                        transaction.gateway_response = response.get("response") or str(response)
+                        transaction.gateway_transaction_id = response.get("transaction_id")
+                    else:
+                        transaction.gateway_response = str(response)
                 
                 db.add(transaction)
                 db.commit()
-                db.refresh(transaction)
                 
-                # Update pending request status
                 req.status = "done"
                 req.processed_at = datetime.now(timezone.utc)
                 db.commit()
-
-                # Send confirmation email asynchronously (uncomment when ready)
-                # if transaction:
-                #     send_transaction_confirmation_email.delay(transaction.id)
                 
-                logger.info(f"Successfully processed transaction {transaction.id} ({req.transaction_type}) for {req.msisdn}")
+                logger.info(f"Processed transaction {transaction.id} ({req.transaction_type}) - Amount: {amount}, Fee: {fee_info['fee_amount']}")
 
             except Exception as e:
-                logger.error(f"Failed to process pending transaction {req.id}: {str(e)}")
+                logger.error(f"Failed to process transaction {req.id if req else 'N/A'}: {str(e)}")
                 
-                # Release held balance if it was held
-                if 'held_balance' in locals() and held_balance and 'destination_country' in locals():
+                # Release held balance if applicable
+                if 'hold_amount' in locals() and 'destination_country' in locals():
                     try:
                         balance_manager.release_balance(
                             db, 
                             company_id, 
                             destination_country.id, 
-                            amount,
-                            success=False  # Failed transaction
+                            hold_amount,
+                            success=False
                         )
                     except Exception as balance_error:
-                        logger.error(f"Failed to release balance for failed transaction {req.id}: {str(balance_error)}")
+                        logger.error(f"Failed to release balance: {str(balance_error)}")
                 
-                # Update pending transaction status
+                # Update status
                 req.status = "failed"
                 req.error_message = str(e)[:500]
                 
-                # If transaction was created, update its status too
                 if transaction:
                     transaction.status = "failed"
                     transaction.error_message = str(e)
@@ -318,7 +317,6 @@ def process_transaction_queue(self):
 
     except Exception as e:
         logger.error(f"Transaction queue processing failed: {str(e)}")
-        # Retry the entire task if something went wrong
         self.retry(countdown=60)
     
     finally:
