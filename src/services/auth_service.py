@@ -1,7 +1,7 @@
-# src/services/auth_service.py
+# src/services/auth_service.py (Simplified)
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone, timedelta
-from src.models.transaction import JWTBlacklist, OTPCode, APIKey, RefreshToken, User, Company
+from datetime import datetime, timezone
+from src.models.transaction import JWTBlacklist, OTPCode, APIKey, RefreshToken, User
 from src.core.security import SecurityUtils
 from src.schemas.transaction import UserLogin, OTPVerify, APIKeyCreate
 import logging
@@ -10,9 +10,13 @@ from typing import Optional, Dict, Any
 logger = logging.getLogger(__name__)
 
 class AuthService:
-    # User Authentication
+    # ==================== USER AUTHENTICATION ====================
     @staticmethod
     def authenticate_user(db: Session, login_data: UserLogin) -> Optional[User]:
+        """
+        Authenticate a user by email and password.
+        """
+        # Find active user by email
         user = db.query(User).filter(
             User.email == login_data.email,
             User.is_active == True
@@ -21,13 +25,18 @@ class AuthService:
         if not user:
             return None
         
+        # Verify password using SecurityUtils
         if not SecurityUtils.verify_password(login_data.password, user.password_hash):
             return None
         
         return user
     
+    # ==================== OTP MANAGEMENT ====================
     @staticmethod
     def generate_otp(db: Session, user: User, purpose: str = "login") -> str:
+        """
+        Generate and store OTP for user.
+        """
         # Invalidate previous OTPs for the same purpose
         db.query(OTPCode).filter(
             OTPCode.user_id == user.id,
@@ -35,10 +44,11 @@ class AuthService:
             OTPCode.is_used == False
         ).update({"is_used": True})
         
-        # Generate new OTP
+        # Generate new OTP using SecurityUtils
         otp_code = SecurityUtils.generate_otp()
         expires_at = SecurityUtils.get_otp_expiry()
         
+        # Store OTP in database
         otp = OTPCode(
             user_id=user.id,
             code=otp_code,
@@ -56,6 +66,9 @@ class AuthService:
     
     @staticmethod
     def verify_otp(db: Session, verify_data: OTPVerify, purpose: str = "login") -> Optional[User]:
+        """
+        Verify OTP and return user if valid.
+        """
         user = db.query(User).filter(
             User.email == verify_data.email,
             User.is_active == True
@@ -64,6 +77,7 @@ class AuthService:
         if not user:
             return None
         
+        # Find valid OTP
         otp = db.query(OTPCode).filter(
             OTPCode.user_id == user.id,
             OTPCode.code == verify_data.otp_code,
@@ -81,9 +95,12 @@ class AuthService:
         
         return user
     
+    # ==================== TOKEN MANAGEMENT ====================
     @staticmethod
     def create_tokens(db: Session, user: User, device_info: Dict[str, Any] = None) -> Dict[str, Any]:
-        # Create access token
+        """
+        Create access and refresh tokens for user.
+        """
         token_data = {
             "sub": str(user.id),
             "email": user.email,
@@ -91,9 +108,8 @@ class AuthService:
             "role": user.role
         }
         
+        # Use SecurityUtils to create tokens
         access_token, expires_at, jti = SecurityUtils.create_access_token(token_data)
-        
-        # Create refresh token
         refresh_token, refresh_expires_at = SecurityUtils.create_refresh_token(token_data)
         
         # Store hashed refresh token in database
@@ -120,7 +136,10 @@ class AuthService:
     
     @staticmethod
     def validate_access_token(db: Session, token: str) -> Optional[User]:
-        # Verify JWT token
+        """
+        Validate access token and return user if valid.
+        """
+        # Verify token using SecurityUtils
         payload = SecurityUtils.verify_access_token(token)
         if not payload:
             return None
@@ -133,7 +152,7 @@ class AuthService:
         if blacklisted:
             return None
         
-        # Get user
+        # Get user from database
         user_id = payload.get("sub")
         if not user_id:
             return None
@@ -147,7 +166,10 @@ class AuthService:
     
     @staticmethod
     def refresh_tokens(db: Session, refresh_token: str, device_info: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
-        # Verify refresh token
+        """
+        Refresh access token using refresh token.
+        """
+        # Verify refresh token using SecurityUtils
         payload = SecurityUtils.verify_refresh_token(refresh_token)
         if not payload:
             return None
@@ -156,7 +178,7 @@ class AuthService:
         if not user_id:
             return None
         
-        # Check if refresh token exists and is valid
+        # Check if refresh token exists in database
         hashed_token = SecurityUtils.hash_refresh_token(refresh_token)
         token_record = db.query(RefreshToken).filter(
             RefreshToken.token == hashed_token,
@@ -182,9 +204,12 @@ class AuthService:
         # Create new tokens
         return AuthService.create_tokens(db, user, device_info)
     
+    # ==================== LOGOUT MANAGEMENT ====================
     @staticmethod
     def logout_user(db: Session, token: str, reason: str = "logout") -> bool:
-        """Blacklist JWT token"""
+        """
+        Blacklist JWT token on logout.
+        """
         payload = SecurityUtils.verify_access_token(token)
         if not payload:
             return False
@@ -214,7 +239,9 @@ class AuthService:
     
     @staticmethod
     def logout_all_devices(db: Session, user_id: int) -> bool:
-        """Invalidate all refresh tokens and blacklist current tokens for a user"""
+        """
+        Invalidate all tokens for a user.
+        """
         # Invalidate all refresh tokens
         db.query(RefreshToken).filter(
             RefreshToken.user_id == user_id,
@@ -224,9 +251,13 @@ class AuthService:
         db.commit()
         return True
     
-    # API Key Management
+    # ==================== API KEY MANAGEMENT ====================
     @staticmethod
     def create_api_key(db: Session, company_id: int, create_data: APIKeyCreate) -> dict:
+        """
+        Create API key for a company.
+        """
+        # Generate keys using SecurityUtils
         api_key = SecurityUtils.generate_api_key()
         api_secret = SecurityUtils.generate_api_secret()
         hashed_secret = SecurityUtils.hash_api_secret(api_secret)
@@ -244,11 +275,12 @@ class AuthService:
         db.commit()
         db.refresh(api_key_record)
         
+        # Return the secret only once
         return {
             "id": api_key_record.id,
             "name": api_key_record.name,
             "key": api_key,
-            "secret": api_secret,  # Only returned once
+            "secret": api_secret,
             "permissions": create_data.permissions,
             "expires_at": create_data.expires_at,
             "created_at": api_key_record.created_at
@@ -256,6 +288,9 @@ class AuthService:
     
     @staticmethod
     def validate_api_key(db: Session, api_key: str, api_secret: str) -> Optional[APIKey]:
+        """
+        Validate API key and secret.
+        """
         key_record = db.query(APIKey).filter(
             APIKey.key == api_key,
             APIKey.is_active == True
@@ -268,6 +303,7 @@ class AuthService:
         if key_record.expires_at and key_record.expires_at < datetime.now(timezone.utc):
             return None
         
+        # Verify secret using SecurityUtils
         if not SecurityUtils.verify_api_secret(api_secret, key_record.secret):
             return None
         
@@ -279,12 +315,18 @@ class AuthService:
     
     @staticmethod
     def get_company_api_keys(db: Session, company_id: int):
+        """
+        Get all API keys for a company.
+        """
         return db.query(APIKey).filter(
             APIKey.company_id == company_id
         ).order_by(APIKey.created_at.desc()).all()
     
     @staticmethod
     def revoke_api_key(db: Session, key_id: int, company_id: int) -> bool:
+        """
+        Revoke an API key.
+        """
         key = db.query(APIKey).filter(
             APIKey.id == key_id,
             APIKey.company_id == company_id

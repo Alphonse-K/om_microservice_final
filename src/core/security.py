@@ -1,4 +1,4 @@
-# src/core/security.py
+# src/core/security.py (Updated)
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timezone, timedelta
@@ -26,19 +26,39 @@ OTP_EXPIRE_MINUTES = 5
 API_KEY_LENGTH = 32
 API_SECRET_LENGTH = 64
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Use bcrypt_sha256 which automatically handles long passwords
+pwd_context = CryptContext(
+    schemes=["bcrypt_sha256"],  # Automatically pre-hashes with SHA-256
+    deprecated="auto"
+)
 
 class SecurityUtils:
-    # Password hashing
+    # ==================== PASSWORD HANDLING ====================
     @staticmethod
     def hash_password(password: str) -> str:
+        """
+        Hash a password securely.
+        Uses bcrypt_sha256 which automatically handles passwords longer than 72 bytes.
+        """
+        if not password:
+            raise ValueError("Password cannot be empty")
+        
+        # Add password length validation (optional but recommended)
+        if len(password) > 1000:  # Very extreme limit
+            raise ValueError("Password is too long")
+        
         return pwd_context.hash(password)
     
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
+        """
+        Verify a password against its hash.
+        """
+        if not plain_password:
+            return False
         return pwd_context.verify(plain_password, hashed_password)
     
-    # JWT Token Generation
+    # ==================== JWT TOKEN GENERATION ====================
     @staticmethod
     def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> tuple[str, datetime, str]:
         """Create JWT access token with jti claim"""
@@ -79,6 +99,7 @@ class SecurityUtils:
         encoded_jwt = jwt.encode(to_encode, REFRESH_SECRET_KEY, algorithm=ALGORITHM)
         return encoded_jwt, expire
     
+    # ==================== TOKEN VERIFICATION ====================
     @staticmethod
     def verify_access_token(token: str) -> Optional[Dict[str, Any]]:
         """Verify JWT access token"""
@@ -101,7 +122,7 @@ class SecurityUtils:
         except JWTError:
             return None
     
-    # OTP Generation
+    # ==================== OTP GENERATION ====================
     @staticmethod
     def generate_otp() -> str:
         return ''.join([str(secrets.randbelow(10)) for _ in range(6)])
@@ -110,7 +131,7 @@ class SecurityUtils:
     def get_otp_expiry() -> datetime:
         return datetime.now(timezone.utc) + timedelta(minutes=OTP_EXPIRE_MINUTES)
     
-    # API Key Generation
+    # ==================== API KEY GENERATION ====================
     @staticmethod
     def generate_api_key() -> str:
         return secrets.token_urlsafe(API_KEY_LENGTH)
@@ -127,18 +148,21 @@ class SecurityUtils:
     def verify_api_secret(plain_secret: str, hashed_secret: str) -> bool:
         return pwd_context.verify(plain_secret, hashed_secret)
     
-    # Refresh Token Hashing
+    # ==================== REFRESH TOKEN HASHING ====================
     @staticmethod
     def hash_refresh_token(token: str) -> str:
+        """Hash refresh token for database storage"""
         return pwd_context.hash(token)
     
     @staticmethod
     def verify_refresh_token_hash(plain_token: str, hashed_token: str) -> bool:
+        """Verify refresh token hash"""
         return pwd_context.verify(plain_token, hashed_token)
     
-    # HMAC Signature for API calls
+    # ==================== HMAC SIGNATURE ====================
     @staticmethod
     def generate_hmac_signature(secret: str, message: str) -> str:
+        """Generate HMAC signature for API calls"""
         return hmac.new(
             secret.encode(),
             message.encode(),
@@ -147,5 +171,6 @@ class SecurityUtils:
     
     @staticmethod
     def verify_hmac_signature(secret: str, message: str, signature: str) -> bool:
+        """Verify HMAC signature"""
         expected_signature = SecurityUtils.generate_hmac_signature(secret, message)
         return hmac.compare_digest(expected_signature, signature)
