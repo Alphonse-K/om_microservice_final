@@ -96,7 +96,6 @@ class AuthService:
                 user.email,
                 user.name,
                 otp_code,
-                otp_type
             )
             logger.info(f"OTP email sent to {user.email}")
         except Exception as email_error:
