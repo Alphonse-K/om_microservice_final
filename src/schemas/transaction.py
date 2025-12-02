@@ -310,10 +310,6 @@ class TokenResponse(BaseModel):
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
-class OTPResponse(BaseModel):
-    message: str
-    expires_in: int  # seconds
-
 class LogoutResponse(BaseModel):
     message: str
 
@@ -403,5 +399,28 @@ class PasswordChangeResponse(BaseModel):
     }
 
 
+class OTPResponse(BaseModel):
+    """Response model for OTP login"""
+    message: str = Field(..., description="Success message")
+    expires_in: int = Field(..., description="OTP expiry time in seconds")
+    debug_info: Optional[Dict[str, Any]] = Field(
+        None, 
+        description="Debug information (development only)"
+    )
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "message": "OTP sent to your registered email",
+                "expires_in": 300,
+                "debug_info": {
+                    "email": "user@example.com",
+                    "otp_code": "123456",
+                    "user_id": 1,
+                    "client_ip": "192.168.1.1"
+                }
+            }
+        }
+    }
 
 

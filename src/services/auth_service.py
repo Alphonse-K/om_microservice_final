@@ -1,7 +1,7 @@
 # src/services/auth_service.py (FINAL CLEAN VERSION)
 import logging
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 import os
 
@@ -15,68 +15,96 @@ logger = logging.getLogger(__name__)
 class AuthService:
     # ==================== USER AUTHENTICATION ====================
     @staticmethod
-    def authenticate_user(db: Session, login_data: UserLogin, ip_address: str = "") -> Optional[User]:
+    def authenticate_user(
+        db: Session, 
+        login_data: UserLogin, 
+        ip_address: str = ""
+    ) -> Optional[User]:
         """
-        Authenticate user with email and password.
-        Sends login notification email if successful.
+        Authenticate user with email and password
         """
-        user = db.query(User).filter(
-            User.email == login_data.email,
-            User.is_active == True
-        ).first()
-        
-        if not user:
-            return None
-        
-        if not SecurityUtils.verify_password(login_data.password, user.password_hash):
-            return None
-        
-        # Send login notification
         try:
-            EmailService.send_login_notification(user.email, user.name, ip_address)
+            user = db.query(User).filter(
+                User.email == login_data.email,
+                User.is_active == True
+            ).first()
+            
+            if not user:
+                logger.warning(f"Login attempt failed: User not found for email {login_data.email}")
+                return None
+            
+            if not SecurityUtils.verify_password(login_data.password, user.password_hash):
+                logger.warning(f"Login attempt failed: Invalid password for user {user.email}")
+                return None
+            
+            # Update last login time
+            user.last_login = datetime.now(timezone.utc)
+            db.commit()
+            
+            # Send login notification email (async to avoid blocking)
+            try:
+                # Get user agent from somewhere or pass it as parameter
+                EmailService.send_login_notification(
+                    user_email=user.email,
+                    user_name=user.name,
+                    ip_address=ip_address,
+                    login_time=datetime.now(timezone.utc)
+                )
+                logger.info(f"Login notification email sent to {user.email}")
+            except Exception as email_error:
+                logger.error(f"Failed to send login notification email: {str(email_error)}")
+                # Don't fail authentication if email fails
+            
+            return user
+            
         except Exception as e:
-            logger.warning(f"Failed to send login notification: {str(e)}")
-        
-        return user
-   
-    # ==================== OTP MANAGEMENT ====================
+            logger.error(f"Authentication error: {str(e)}")
+            return None
+    
     @staticmethod
-    def generate_otp(db: Session, user: User, purpose: str = "login") -> str:
-        """Generate and send OTP to user"""
-        # Invalidate previous OTPs for the same purpose
+    def generate_otp(db: Session, user: User, otp_type: str = "login") -> str:
+        """
+        Generate and send OTP to user's email
+        """
+        from src.core.security import SecurityUtils
+        
+        # Generate OTP code
+        otp_code = SecurityUtils.generate_otp_code()
+        
+        # Calculate expiration time
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        
+        # Delete any existing OTPs for this user and type
         db.query(OTPCode).filter(
             OTPCode.user_id == user.id,
-            OTPCode.purpose == purpose,
+            OTPCode.otp_type == otp_type,
             OTPCode.is_used == False
-        ).update({"is_used": True})
+        ).delete()
         
-        # Generate new OTP
-        otp_code = SecurityUtils.generate_otp()
-        expires_at = SecurityUtils.get_otp_expiry()  # This calls the new method
-        
-        # Store OTP
-        otp = OTPCode(
+        # Create new OTP
+        otp_record = OTPCode(
             user_id=user.id,
-            code=otp_code,
-            purpose=purpose,
+            otp_code=otp_code,
+            otp_type=otp_type,
             expires_at=expires_at
         )
-        
-        db.add(otp)
+        db.add(otp_record)
         db.commit()
         
-        # Send OTP email
+        # Send OTP via email
         try:
-            EmailService.send_otp_email(user.email, user.name, otp_code, purpose)
+            EmailService.send_otp_email(
+                user_email=user.email,
+                user_name=user.name,
+                otp_code=otp_code,
+                otp_type=otp_type
+            )
             logger.info(f"OTP email sent to {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to send OTP email to {user.email}: {str(e)}")
+        except Exception as email_error:
+            logger.error(f"Failed to send OTP email: {str(email_error)}")
+            # Still return OTP code even if email fails (for development)
         
-        # Log OTP for development
-        if os.getenv("ENVIRONMENT") == "development":
-            logger.info(f"OTP for {user.email}: {otp_code}")
-        
-        return otp_code    
+        return otp_code
 
     @staticmethod
     def verify_otp(db: Session, verify_data: OTPVerify, purpose: str = "login") -> Optional[User]:

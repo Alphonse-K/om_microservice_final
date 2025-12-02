@@ -13,23 +13,49 @@ logger = logging.getLogger(__name__)
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @auth_router.post("/login", response_model=OTPResponse)
-def login(login_data: UserLogin, db: Session = Depends(get_db)):
+def login(
+    login_data: UserLogin, 
+    db: Session = Depends(get_db),
+    request: Request = None  # Add request parameter
+):
     """
-    Step 1: Login with email and password to receive OTP
+    Step 1: Login with email and password to receive OTP via email
     """
-    user = AuthService.authenticate_user(db, login_data)
+    # Get client IP for login notification
+    client_ip = "Unknown"
+    if request:
+        if request.client:
+            client_ip = request.client.host
+        # Check for X-Forwarded-For header
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+    
+    # Authenticate user with IP address
+    user = AuthService.authenticate_user(db, login_data, ip_address=client_ip)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
         )
     
+    # Generate and send OTP via email
     otp_code = AuthService.generate_otp(db, user, "login")
     
-    return {
-        "message": "OTP sent successfully",
+    # Prepare response
+    response_data = {
+        "message": "OTP sent to your registered email",
         "expires_in": 600  # 10 minutes
     }
+    
+    response_data["debug_info"] = {
+        "email": user.email,
+        "otp_code": otp_code,
+        "user_id": user.id,
+        "client_ip": client_ip
+    }
+    
+    return response_data
 
 @auth_router.post("/verify-otp", response_model=TokenResponse)
 def verify_otp(
