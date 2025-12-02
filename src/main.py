@@ -34,7 +34,7 @@ def root():
     return {"message": "CashMoov API is running"}
 
 
-# # scripts/create_admin.py
+# scripts/create_admin.py
 # import sys
 # import os
 # sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

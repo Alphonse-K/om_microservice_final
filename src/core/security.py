@@ -26,9 +26,9 @@ OTP_EXPIRE_MINUTES = 5
 API_KEY_LENGTH = 32
 API_SECRET_LENGTH = 64
 
-# Use bcrypt_sha256 which automatically handles long passwords
 pwd_context = CryptContext(
-    schemes=["bcrypt_sha256"],  # Automatically pre-hashes with SHA-256
+    schemes=["bcrypt_sha256"], 
+    bcrypt_sha256__default_rounds=12,
     deprecated="auto"
 )
 
@@ -43,10 +43,11 @@ class SecurityUtils:
         if not password:
             raise ValueError("Password cannot be empty")
         
-        # Add password length validation (optional but recommended)
-        if len(password) > 1000:  # Very extreme limit
-            raise ValueError("Password is too long")
+        # Simple validation
+        if len(password) < 1:
+            raise ValueError("Password cannot be empty")
         
+        # bcrypt_sha256 will handle long passwords automatically
         return pwd_context.hash(password)
     
     @staticmethod
@@ -56,8 +57,12 @@ class SecurityUtils:
         """
         if not plain_password:
             return False
-        return pwd_context.verify(plain_password, hashed_password)
-    
+        
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False    
+        
     # ==================== JWT TOKEN GENERATION ====================
     @staticmethod
     def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> tuple[str, datetime, str]:
