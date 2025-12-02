@@ -381,11 +381,15 @@ class PasswordChange(BaseModel):
         return v
     
     @field_validator('confirm_password')
-    def passwords_match(cls, v, values):
-        if 'new_password' in values and v != values['new_password']:
+    def passwords_match(cls, v, info):
+        """Ensure new_password and confirm_password match"""
+        # Use info.data.get() to safely access the value
+        new_password = info.data.get('new_password')
+        if new_password is not None and v != new_password:
             raise ValueError('Passwords do not match')
         return v
-
+    
+    
 class PasswordChangeResponse(BaseModel):
     """Schema for password change response"""
     message: str = Field(..., description="Success message")
