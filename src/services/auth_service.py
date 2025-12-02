@@ -45,10 +45,10 @@ class AuthService:
             try:
                 # Get user agent from somewhere or pass it as parameter
                 EmailService.send_login_notification(
-                    user_email=user.email,
-                    user_name=user.name,
-                    ip_address=ip_address,
-                    login_time=datetime.now(timezone.utc)
+                    user.email,
+                    user.name,
+                    ip_address,
+                    datetime.now(timezone.utc)
                 )
                 logger.info(f"Login notification email sent to {user.email}")
             except Exception as email_error:
@@ -94,10 +94,10 @@ class AuthService:
         # Send OTP via email
         try:
             EmailService.send_otp_email(
-                user_email=user.email,
-                user_name=user.name,
-                otp_code=otp_code,
-                otp_type=otp_type
+                user.email,
+                user.name,
+                otp_code,
+                otp_type
             )
             logger.info(f"OTP email sent to {user.email}")
         except Exception as email_error:
