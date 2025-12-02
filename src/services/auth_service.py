@@ -69,7 +69,7 @@ class AuthService:
         from src.core.security import SecurityUtils
         
         # Generate OTP code
-        otp_code = SecurityUtils.generate_otp_code()
+        otp_code = SecurityUtils.generate_otp()
         
         # Calculate expiration time
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
