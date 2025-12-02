@@ -38,9 +38,18 @@ class EmailService:
     """Simple SMTP email service for CashMoov"""
     
     @staticmethod
-    def send_otp_email(to_email: str, to_name: str, otp_code: str, purpose: str = None) -> bool:
+    def send_otp_email(
+        to_email: str, 
+        to_name: str, 
+        otp_code: str, 
+        purpose: str = None  # Make it optional with default
+    ) -> bool:
         """Send OTP email in plain text"""
         try:
+            # Set default purpose if not provided
+            if purpose is None:
+                purpose = "login"
+            
             subject_map = {
                 "login": "CashMoov - Login OTP",
                 "reset": "CashMoov - Password Reset OTP",
@@ -75,8 +84,8 @@ class EmailService:
             
         except Exception as e:
             logger.error(f"Failed to send OTP email to {to_email}: {str(e)}")
-            return False
-    
+            return False  
+      
     @staticmethod
     def send_welcome_email(to_email: str, to_name: str) -> bool:
         """Send welcome email to new users"""
