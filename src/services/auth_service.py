@@ -48,7 +48,6 @@ class AuthService:
                     user.email,
                     user.name,
                     ip_address,
-                    datetime.now(timezone.utc)
                 )
                 logger.info(f"Login notification email sent to {user.email}")
             except Exception as email_error:
