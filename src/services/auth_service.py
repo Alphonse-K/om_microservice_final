@@ -69,10 +69,10 @@ class AuthService:
         from src.core.security import SecurityUtils
         
         # Generate OTP code
-        otp_code = SecurityUtils.generate_otp_code()
+        otp_code = SecurityUtils.generate_otp()
         
         # Calculate expiration time
-        expires_at = datetime.utcnow() + timedelta(minutes=10)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         
         # Delete any existing OTPs for this user and purpose
         db.query(OTPCode).filter(
@@ -118,7 +118,7 @@ class AuthService:
                 OTPCode.code == verify_data.otp_code,
                 OTPCode.purpose == otp_type,  # Changed from otp_type to purpose
                 OTPCode.is_used == False,
-                OTPCode.expires_at > datetime.utcnow()
+                OTPCode.expires_at > datetime.now(timezone.utc)
             ).first()
             
             if not otp_record:
@@ -127,13 +127,13 @@ class AuthService:
             
             # Mark OTP as used
             otp_record.is_used = True
-            otp_record.used_at = datetime.utcnow()
+            otp_record.used_at = datetime.now(timezone.utc)
             
             # Get user
             user = otp_record.user
             
             # Update user's last login
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             db.commit()
             
             logger.info(f"OTP verified successfully for user: {user.email}")
