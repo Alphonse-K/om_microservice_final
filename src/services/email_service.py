@@ -42,13 +42,16 @@ class EmailService:
         to_email: str, 
         to_name: str, 
         otp_code: str, 
-        purpose: str = None  # Make it optional with default
+        purpose: str = None
     ) -> bool:
         """Send OTP email in plain text"""
+        logger.info(f"[send_otp_email] Starting - To: {to_email}, Name: {to_name}, Purpose: {purpose}")
+        
         try:
             # Set default purpose if not provided
             if purpose is None:
                 purpose = "login"
+                logger.info(f"[send_otp_email] Using default purpose: {purpose}")
             
             subject_map = {
                 "login": "CashMoov - Login OTP",
@@ -57,6 +60,7 @@ class EmailService:
                 "transaction": "CashMoov - Transaction OTP"
             }
             subject = subject_map.get(purpose, "CashMoov - OTP Code")
+            logger.info(f"[send_otp_email] Subject: {subject}")
             
             content = f"""
                 CASHMOOV SECURE OTP
@@ -80,12 +84,15 @@ class EmailService:
                 {datetime.now().year} © CashMoov. All rights reserved.
             """
             
-            return EmailService._send_email(to_email, to_name, subject, content)
+            logger.info(f"[send_otp_email] Calling _send_email...")
+            result = EmailService._send_email(to_email, to_name, subject, content)
+            logger.info(f"[send_otp_email] _send_email returned: {result}")
+            return result
             
         except Exception as e:
-            logger.error(f"Failed to send OTP email to {to_email}: {str(e)}")
-            return False  
-      
+            logger.error(f"[send_otp_email] Failed to send OTP email to {to_email}: {str(e)}", exc_info=True)
+            return False
+          
     @staticmethod
     def send_welcome_email(to_email: str, to_name: str) -> bool:
         """Send welcome email to new users"""

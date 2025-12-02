@@ -67,41 +67,57 @@ class AuthService:
         """
         from src.core.security import SecurityUtils
         
+        logger.info(f"=== START generate_otp for user: {user.email}, type: {otp_type} ===")
+        
         # Generate OTP code
         otp_code = SecurityUtils.generate_otp()
+        logger.info(f"Generated OTP code: {otp_code}")
         
         # Calculate expiration time
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        logger.info(f"OTP expires at: {expires_at}")
         
         # Delete any existing OTPs for this user and purpose
-        db.query(OTPCode).filter(
+        deleted_count = db.query(OTPCode).filter(
             OTPCode.user_id == user.id,
-            OTPCode.purpose == otp_type,  # Changed from otp_type to purpose
+            OTPCode.purpose == otp_type,
             OTPCode.is_used == False
         ).delete(synchronize_session=False)
+        logger.info(f"Deleted {deleted_count} existing OTPs")
         
         # Create new OTP
         otp_record = OTPCode(
             user_id=user.id,
             code=otp_code,
-            purpose=otp_type,  # Changed from otp_type to purpose
+            purpose=otp_type,
             expires_at=expires_at
         )
         db.add(otp_record)
         db.commit()
+        logger.info(f"Created OTP record with ID: {otp_record.id}")
         
         # Send OTP via email
         try:
-            EmailService.send_otp_email(
+            logger.info(f"Attempting to send OTP email to: {user.email}")
+            logger.info(f"Calling send_otp_email with: email={user.email}, name={user.name}, otp={otp_code}, purpose={otp_type}")
+            
+            # Call email service
+            email_sent = EmailService.send_otp_email(
                 user.email,
                 user.name,
                 otp_code,
+                otp_type  # This should be passed
             )
-            logger.info(f"OTP email sent to {user.email}")
+            
+            if email_sent:
+                logger.info(f"✓ OTP email sent successfully to {user.email}")
+            else:
+                logger.error(f"✗ EmailService.send_otp_email returned False for {user.email}")
+                
         except Exception as email_error:
-            logger.error(f"Failed to send OTP email: {str(email_error)}")
-            # Still return OTP code even if email fails (for development)
+            logger.error(f"✗ Exception in send_otp_email: {str(email_error)}", exc_info=True)
         
+        logger.info(f"=== END generate_otp for user: {user.email} ===")
         return otp_code
 
     @staticmethod
