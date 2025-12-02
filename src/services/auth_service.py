@@ -69,23 +69,23 @@ class AuthService:
         from src.core.security import SecurityUtils
         
         # Generate OTP code
-        otp_code = SecurityUtils.generate_otp()
+        otp_code = SecurityUtils.generate_otp_code()
         
         # Calculate expiration time
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+        expires_at = datetime.utcnow() + timedelta(minutes=10)
         
-        # Delete any existing OTPs for this user and type
+        # Delete any existing OTPs for this user and purpose
         db.query(OTPCode).filter(
             OTPCode.user_id == user.id,
-            OTPCode.otp_type == otp_type,
+            OTPCode.purpose == otp_type,  # Changed from otp_type to purpose
             OTPCode.is_used == False
-        ).delete()
+        ).delete(synchronize_session=False)
         
         # Create new OTP
         otp_record = OTPCode(
             user_id=user.id,
-            otp_code=otp_code,
-            otp_type=otp_type,
+            code=otp_code,
+            purpose=otp_type,  # Changed from otp_type to purpose
             expires_at=expires_at
         )
         db.add(otp_record)
@@ -107,36 +107,42 @@ class AuthService:
         return otp_code
 
     @staticmethod
-    def verify_otp(db: Session, verify_data: OTPVerify, purpose: str = "login") -> Optional[User]:
+    def verify_otp(db: Session, verify_data: OTPVerify, otp_type: str = "login") -> Optional[User]:
         """
-        Verify OTP and return user if valid.
+        Verify OTP code for a user
         """
-        user = db.query(User).filter(
-            User.email == verify_data.email,
-            User.is_active == True
-        ).first()
-        
-        if not user:
+        try:
+            # Find the OTP record
+            otp_record = db.query(OTPCode).join(User).filter(
+                User.email == verify_data.email,
+                OTPCode.code == verify_data.otp_code,
+                OTPCode.purpose == otp_type,  # Changed from otp_type to purpose
+                OTPCode.is_used == False,
+                OTPCode.expires_at > datetime.utcnow()
+            ).first()
+            
+            if not otp_record:
+                logger.warning(f"Invalid OTP attempt for email: {verify_data.email}")
+                return None
+            
+            # Mark OTP as used
+            otp_record.is_used = True
+            otp_record.used_at = datetime.utcnow()
+            
+            # Get user
+            user = otp_record.user
+            
+            # Update user's last login
+            user.last_login = datetime.utcnow()
+            db.commit()
+            
+            logger.info(f"OTP verified successfully for user: {user.email}")
+            return user
+            
+        except Exception as e:
+            logger.error(f"OTP verification error: {str(e)}")
+            db.rollback()
             return None
-        
-        # Find valid OTP
-        otp = db.query(OTPCode).filter(
-            OTPCode.user_id == user.id,
-            OTPCode.code == verify_data.otp_code,
-            OTPCode.purpose == purpose,
-            OTPCode.is_used == False,
-            OTPCode.expires_at > datetime.now(timezone.utc)
-        ).first()
-        
-        if not otp:
-            return None
-        
-        # Mark OTP as used
-        otp.is_used = True
-        otp.used_at = datetime.now(timezone.utc)
-        db.commit()
-        
-        return user
     
     # ==================== USER MANAGEMENT ====================
     @staticmethod
