@@ -32,3 +32,8 @@ app.include_router(email_router)  # If you have auth
 @app.get("/")
 def root():
     return {"message": "CashMoov API is running"}
+
+
+
+
+
