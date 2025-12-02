@@ -352,5 +352,56 @@ class APIKeyListResponse(BaseModel):
     expires_at: Optional[datetime]
 
 
+class PasswordChange(BaseModel):
+    """Schema for password change request"""
+    old_password: str = Field(
+        ..., 
+        min_length=1, 
+        description="Current password"
+    )
+    new_password: str = Field(
+        ..., 
+        min_length=8, 
+        description="New password (min 8 characters)"
+    )
+    confirm_password: str = Field(
+        ..., 
+        min_length=8, 
+        description="Confirm new password"
+    )
+    
+    @field_validator('new_password')
+    def validate_new_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if len(v) > 128:
+            raise ValueError("Password cannot exceed 128 characters")
+        if not any(char.isdigit() for char in v):
+            raise ValueError("Password must contain at least one number")
+        if not any(char.isupper() for char in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(char.islower() for char in v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        return v
+    
+    @field_validator('confirm_password')
+    def passwords_match(cls, v, values):
+        if 'new_password' in values and v != values['new_password']:
+            raise ValueError('Passwords do not match')
+        return v
+
+class PasswordChangeResponse(BaseModel):
+    """Schema for password change response"""
+    message: str = Field(..., description="Success message")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "message": "Password changed successfully"
+            }
+        }
+    }
+
+
 
 

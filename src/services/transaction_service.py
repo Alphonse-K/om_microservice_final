@@ -227,37 +227,6 @@ def update_balance(db: Session, balance_id: int, data: CompanyBalanceUpdate):
     db.refresh(balance)
     return balance
 
-def create_user(db: Session, data: UserCreate):
-    user = User(
-        name=data.name,
-        email=data.email,
-        role=data.role,
-        company_id=data.company_id,
-        password_hash=SecurityUtils.hash_password(data.password),
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-def list_users(db: Session):
-    return db.query(User).all()
-
-def get_user(db: Session, user_id: int):
-    return db.query(User).filter(User.id == user_id).first()
-
-def update_user(db: Session, user_id: int, data: UserUpdate):
-    user = get_user(db, user_id)
-    if not user:
-        return None
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(user, key, value)
-
-    db.commit()
-    db.refresh(user)
-    return user
-
 def create_fee_config(db: Session, data: FeeConfigCreate):
     config = FeeConfig(**data.model_dump())
     db.add(config)

@@ -7,9 +7,10 @@ from typing import List, Optional
 from src.core.database import get_db
 from src.core.auth_dependencies import get_current_user, require_role
 from src.services.transaction_service import *
+from src.services.auth_service import AuthService
 from src.schemas.transaction import *
-from src.schemas.transaction import CompanyCreate, CompanyUpdate, CompanyResponse, CompanyStatsResponse
-
+from src.schemas.transaction import CompanyCreate, CompanyUpdate, CompanyResponse, CompanyStatsResponse, PasswordChange, PasswordChangeResponse
+ 
 # Import auth dependencies
 from src.models.transaction import User
 
@@ -288,26 +289,77 @@ def update(country_id: int, data: CountryUpdate, db: Session = Depends(get_db)):
 
 @user_router.post("/", response_model=UserResponse)
 def create(data: UserCreate, db: Session = Depends(get_db)):
-    return create_user(db, data)
+    return AuthService.create_user(db, data)
 
 @user_router.get("/", response_model=list[UserResponse])
 def retrieve(db: Session = Depends(get_db)):
-    return list_users(db)
+    return AuthService.list_users(db)
 
 @user_router.get("/{user_id}", response_model=UserResponse)
 def retrieve_one(user_id: int, db: Session = Depends(get_db)):
-    user = get_user(db, user_id)
+    user = AuthService.get_user(db, user_id)
     if not user:
         raise HTTPException(404, "User not found")
     return user
 
 @user_router.put("/{user_id}", response_model=UserResponse)
 def update(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
-    updated = update_user(db, user_id, data)
+    updated = AuthService.update_user(db, user_id, data)
     if not updated:
         raise HTTPException(404, "User not found")
     return updated
 
+@user_router.post("/change-password", response_model=PasswordChangeResponse)
+def change_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change current user's password.
+    
+    Requires:
+    - **old_password**: Current password
+    - **new_password**: New password (min 8 chars, with number, uppercase, lowercase)
+    - **confirm_password**: Confirm new password
+    
+    Validates:
+    - Old password must be correct
+    - New password must meet strength requirements
+    - New password must match confirmation
+    - New password must be different from old password
+    """
+    try:
+        success = AuthService.change_password(
+            db=db,
+            user_id=current_user.id,
+            old_password=password_data.old_password,
+            new_password=password_data.new_password,
+            confirm_password=password_data.confirm_password
+        )
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Failed to change password"
+            )
+        
+        return PasswordChangeResponse(message="Password changed successfully")
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Password change error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
+    
 @balance_router.post("/", response_model=CompanyBalanceResponse)
 def create(data: CompanyBalanceCreate, db: Session = Depends(get_db)):
     return create_balance(db, data)
