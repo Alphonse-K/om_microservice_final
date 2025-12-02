@@ -137,21 +137,66 @@ class CompanyStatsResponse(BaseModel):
     transaction_breakdown: Dict[str, int]
     recent_transactions: List[Dict[str, Any]] = []
 
+# class CompanyBalanceBase(BaseModel):
+#     company_id: int
+#     country_id: int
+#     balance: Decimal
+
+# class CompanyBalanceCreate(CompanyBalanceBase):
+#     pass
+
+# class CompanyBalanceUpdate(BaseModel):
+#     balance: Optional[Decimal] = None
+
+# class CompanyBalanceResponse(CompanyBalanceBase):
+#     id: int
+#     model_config = {"from_attributes": True}
+# from decimal import Decimal
+# from typing import Optional
+# from pydantic import BaseModel, Field, ConfigDict
+
 class CompanyBalanceBase(BaseModel):
-    company_id: int
-    country_id: int
-    balance: Decimal
+    """Base schema for company country balance"""
+    company_id: int = Field(..., ge=1, description="Company ID")
+    country_id: int = Field(..., ge=1, description="Country ID")
+    partner_code: str = Field(..., min_length=1, max_length=20, description="Partner code for this country")
 
 class CompanyBalanceCreate(CompanyBalanceBase):
-    pass
+    """Schema for creating a new company country balance"""
+    available_balance: Decimal = Field(default=0, ge=0, description="Initial available balance")
+    held_balance: Decimal = Field(default=0, ge=0, description="Initial held balance")
 
 class CompanyBalanceUpdate(BaseModel):
-    balance: Optional[Decimal] = None
+    """Schema for updating company country balance"""
+    partner_code: Optional[str] = Field(None, min_length=1, max_length=20, description="Partner code")
+    available_balance: Optional[Decimal] = Field(None, ge=0, description="Available balance")
+    held_balance: Optional[Decimal] = Field(None, ge=0, description="Held balance")
+    
+    model_config = ConfigDict(extra="forbid")  # Prevent extra fields
 
 class CompanyBalanceResponse(CompanyBalanceBase):
+    """Schema for company country balance response"""
     id: int
-    model_config = {"from_attributes": True}
-
+    available_balance: Decimal
+    held_balance: Decimal
+    effective_balance: Decimal  # Computed property
+    total_balance: Decimal      # Computed property
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": 1,
+                "company_id": 1,
+                "country_id": 84,  # Iran country code
+                "partner_code": "IRN001",
+                "available_balance": "10000.00",
+                "held_balance": "2500.00",
+                "effective_balance": "7500.00",
+                "total_balance": "12500.00"
+            }
+        }
+    )
 class UserBase(BaseModel):
     name: str
     email: EmailStr
@@ -389,7 +434,7 @@ class PasswordChange(BaseModel):
             raise ValueError('Passwords do not match')
         return v
     
-    
+
 class PasswordChangeResponse(BaseModel):
     """Schema for password change response"""
     message: str = Field(..., description="Success message")
