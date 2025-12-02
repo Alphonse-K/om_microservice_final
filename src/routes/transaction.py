@@ -1,23 +1,17 @@
+# src/routes/transactions.py (update your existing file)
 import os
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, status
 from sqlalchemy.orm import Session
-from src.schemas.transaction import (
-    DepositCreate, WithdrawalCreate, AirtimeCreate,
-    DepositResponse, WithdrawalResponse, AirtimeResponse,
-    UserCreate, UserUpdate, UserResponse, CountryCreate, CountryUpdate, CountryResponse,
-    CompanyBalanceCreate, CompanyBalanceUpdate, CompanyBalanceResponse,
-    FeeConfigCreate, FeeConfigUpdate, FeeConfigResponse,
-    ProcurementCreate, ProcurementUpdate, ProcurementResponse
-)
+from typing import List, Optional
+
 from src.core.database import get_db
-from src.services.transaction_service import (
-    create_deposit, create_airtime_purchase, intitiate_withdrawal_transaction,
-    create_user, list_users, get_user, update_user, create_country, list_countries, 
-    get_country, update_country,
-    create_balance, list_balances, get_balance, update_balance,
-    create_fee_config, list_fee_configs, get_fee_config, update_fee_config,
-    create_procurement, list_procurements, get_procurement, update_procurement
-)    
+from src.core.auth_dependencies import get_current_user, require_role
+from src.services.transaction_service import *
+from src.schemas.transaction import *
+from src.schemas.transaction import CompanyCreate, CompanyUpdate, CompanyResponse, CompanyStatsResponse
+
+# Import auth dependencies
+from src.models.transaction import User
 
 transaction_router = APIRouter(prefix="/api/v1/transactions/request", tags=["Transactions"])
 country_router = APIRouter(prefix="/api/v1/countries", tags=["Countries"])
@@ -26,9 +20,222 @@ balance_router = APIRouter(prefix="/api/v1/company-balances", tags=["Company Bal
 fee_router = APIRouter(prefix="/api/v1/fee-config", tags=["Fee Configuration"])
 procurement_router = APIRouter(prefix="/api/v1/procurements", tags=["Procurements"])
 
+# NEW: Company router
+company_router = APIRouter(prefix="/api/v1/companies", tags=["Companies"])
+
 UPLOAD_DIR = "uploads/procurements"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# ==================== COMPANY ENDPOINTS ====================
+
+@company_router.get("/", response_model=List[CompanyResponse])
+def get_companies(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    active_only: bool = Query(True, description="Return only active companies"),
+    current_user: User = Depends(require_role(["admin", "viewer"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all companies.
+    
+    - **admin** and **viewer** roles can access
+    - Supports pagination
+    - Can filter by active status
+    """
+    companies = list_companies(db, skip=skip, limit=limit, active_only=active_only)
+    return companies
+
+@company_router.get("/count", response_model=dict)
+def get_companies_count(
+    active_only: bool = Query(True, description="Count only active companies"),
+    current_user: User = Depends(require_role(["admin", "viewer"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Get total number of companies.
+    """
+    count = get_companies_count(db, active_only=active_only)
+    return {"total": count}
+
+@company_router.get("/{company_id}", response_model=CompanyResponse)
+def get_company(
+    company_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get a specific company by ID.
+    
+    - All authenticated users can access
+    """
+    company = get_company(db, company_id)
+    if not company:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Company with ID {company_id} not found"
+        )
+    return company
+
+@company_router.post("/", response_model=CompanyResponse, status_code=201)
+def create_company(
+    company_data: CompanyCreate,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new company.
+    
+    - Only **admin** role can create companies
+    - Email and name must be unique
+    """
+    try:
+        company = create_company(db, company_data)
+        return company
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating company: {str(e)}"
+        )
+
+@company_router.put("/{company_id}", response_model=CompanyResponse)
+def update_company(
+    company_id: int,
+    update_data: CompanyUpdate,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Update an existing company.
+    
+    - Only **admin** role can update companies
+    - Partial updates are supported
+    """
+    try:
+        company = update_company(db, company_id, update_data)
+        if not company:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Company with ID {company_id} not found"
+            )
+        return company
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@company_router.delete("/{company_id}", status_code=200)
+def delete_company(
+    company_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Soft delete (deactivate) a company.
+    
+    - Only **admin** role can delete companies
+    - This is a soft delete (sets is_active = False)
+    """
+    success = delete_company(db, company_id)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID {company_id} not found"
+        )
+    return {"message": f"Company {company_id} deactivated successfully"}
+
+@company_router.post("/{company_id}/activate", response_model=CompanyResponse)
+def activate_company(
+    company_id: int,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Activate a deactivated company.
+    
+    - Only **admin** role can activate companies
+    """
+    success = activate_company(db, company_id)
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID {company_id} not found"
+        )
+    
+    company = get_company(db, company_id)
+    return company
+
+@company_router.get("/{company_id}/stats", response_model=CompanyStatsResponse)
+def get_company_stats(
+    company_id: int,
+    current_user: User = Depends(require_role(["admin", "viewer", "maker", "checker"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Get statistics for a company.
+    
+    - All authenticated users with any role can access their own company stats
+    - **admin** can access any company stats
+    """
+    # Check if user has permission to view this company's stats
+    if current_user.role != "admin" and current_user.company_id != company_id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view statistics for your own company"
+        )
+    
+    stats = get_company_stats(db, company_id)
+    if not stats:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with ID {company_id} not found"
+        )
+    
+    return stats
+
+@company_router.get("/search/", response_model=List[CompanyResponse])
+def search_companies(
+    q: str = Query(..., min_length=2, max_length=100, description="Search term"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(require_role(["admin", "viewer"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Search companies by name, email, or phone.
+    
+    - **admin** and **viewer** roles can search
+    - Minimum 2 characters required for search term
+    """
+    companies = search_companies(db, q, skip=skip, limit=limit)
+    return companies
+
+@company_router.get("/email/{email}", response_model=CompanyResponse)
+def get_company_by_email(
+    email: str,
+    current_user: User = Depends(require_role(["admin", "viewer"])),
+    db: Session = Depends(get_db)
+):
+    """
+    Get company by email.
+    
+    - **admin** and **viewer** roles can access
+    """
+    company = get_company_by_email(db, email)
+    if not company:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Company with email {email} not found"
+        )
+    return company
+
+# ==================== EXISTING ENDPOINTS (Keep as is) ====================
 
 # ---------------------- DEPOSIT ----------------------
 @transaction_router.post("/send/orange-money/", response_model=DepositResponse)
@@ -78,7 +285,6 @@ def update(country_id: int, data: CountryUpdate, db: Session = Depends(get_db)):
     if not updated:
         raise HTTPException(404, "Country not found")
     return updated
-
 
 @user_router.post("/", response_model=UserResponse)
 def create(data: UserCreate, db: Session = Depends(get_db)):
@@ -145,7 +351,6 @@ def update(config_id: int, data: FeeConfigUpdate, db: Session = Depends(get_db))
     if not updated:
         raise HTTPException(404, "Fee config not found")
     return updated
-
 
 @procurement_router.post("/", response_model=ProcurementResponse)
 async def create(data: ProcurementCreate, db: Session = Depends(get_db), slip: UploadFile = File(None)):

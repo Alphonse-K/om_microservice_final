@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
-from typing import Literal, List, Any
+from typing import Literal, List, Any, Dict
 
 from src.core.constants import TransactionStatus, WithdrawalStatus
 
@@ -127,6 +127,15 @@ class CompanyResponse(CompanyBase):
     id: int
     model_config = {"from_attributes": True}
 
+class CompanyStatsResponse(BaseModel):
+    company_id: int
+    company_name: str
+    total_users: int
+    active_users: int
+    total_balance: float
+    total_transactions: int
+    transaction_breakdown: Dict[str, int]
+    recent_transactions: List[Dict[str, Any]] = []
 
 class CompanyBalanceBase(BaseModel):
     company_id: int

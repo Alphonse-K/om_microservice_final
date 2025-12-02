@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from src.core.security import SecurityUtils
 
+
 # MODELS
 from src.models.transaction import (
     DepositTransaction,
@@ -307,3 +308,4 @@ def update_procurement(db: Session, procurement_id: int, data: ProcurementUpdate
     db.commit()
     db.refresh(proc)
     return proc
+
