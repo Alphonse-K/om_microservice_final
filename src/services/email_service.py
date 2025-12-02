@@ -38,7 +38,7 @@ class EmailService:
     """Simple SMTP email service for CashMoov"""
     
     @staticmethod
-    def send_otp_email(to_email: str, to_name: str, otp_code: str, purpose: str = "login") -> bool:
+    def send_otp_email(to_email: str, to_name: str, otp_code: str, purpose: str = None) -> bool:
         """Send OTP email in plain text"""
         try:
             subject_map = {
