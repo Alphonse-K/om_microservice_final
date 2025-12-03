@@ -35,13 +35,12 @@ class TransactionType(str, Enum):
     WITHDRAWAL = "withdrawal"
     AIRTIME = "airtime"
 
-from enum import Enum
 
 class RoleEnum(str, Enum):
-    ADMIN = "admin"
-    CHECKER = "checker"
-    USER = "user"
-    Maker = "maker"
+    ADMIN = "ADMIN"
+    CHECKER = "CHECKER"
+    USER = "USER"
+    MAKER = "MAKER"
 
 
 # ========== CORE MODELS ==========

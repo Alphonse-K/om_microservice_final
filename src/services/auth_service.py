@@ -214,30 +214,34 @@ class AuthService:
     
     @staticmethod
     def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return None
+        """Update user safely, including Enum handling for role."""
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return None
 
-        allowed_fields = ["name", "email", "role", "is_active", "company_id"]
+            allowed_fields = ["name", "email", "role", "is_active", "company_id"]
 
-        for field in allowed_fields:
-            if field in update_data:
-                if field == "role":
-                    # Convert string to Enum safely
-                    try:
-                        value = RoleEnum[update_data["role"].upper()]
-                    except KeyError:
-                        raise ValueError(f"Invalid role: {update_data['role']}")
-                    setattr(user, field, value)
-                else:
-                    setattr(user, field, update_data[field])
-        print("after:", user.__dict__)
+            for field in allowed_fields:
+                if field in update_data:
+                    if field == "role":
+                        role_input = str(update_data["role"]).upper()
+                        if role_input not in RoleEnum.__members__:
+                            raise ValueError(f"Invalid role: {update_data['role']}")
+                        setattr(user, field, RoleEnum[role_input])  # Enum object
+                    else:
+                        setattr(user, field, update_data[field])
+                        
+            print("after:", user.__dict__)
 
-        db.add(user)          # <-- ensure SQLAlchemy tracks the object
-        db.commit()
-        db.refresh(user)
-        return user
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return user
 
+        except Exception as e:
+            db.rollback()
+            raise e
 
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
