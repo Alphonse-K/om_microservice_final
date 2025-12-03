@@ -35,6 +35,14 @@ class TransactionType(str, Enum):
     WITHDRAWAL = "withdrawal"
     AIRTIME = "airtime"
 
+from enum import Enum
+
+class RoleEnum(str, Enum):
+    ADMIN = "admin"
+    CHECKER = "checker"
+    USER = "user"
+    VIEWER = "Maker"
+
 
 # ========== CORE MODELS ==========
 class Country(Base):
@@ -89,7 +97,11 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     name = Column(String(100), nullable=False)
-    role = Column(String(50), nullable=False, default="user")
+    role = Column(
+        SAEnum(RoleEnum, name="role_enum"),
+        nullable=False,
+        default=RoleEnum.USER
+    )
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime(timezone=True), nullable=True)

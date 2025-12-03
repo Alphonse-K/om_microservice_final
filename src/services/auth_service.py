@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, List, Any
 import os
 
-from src.models.transaction import JWTBlacklist, OTPCode, APIKey, RefreshToken, User
+from src.models.transaction import JWTBlacklist, OTPCode, APIKey, RefreshToken, User, RoleEnum
 from src.core.security import SecurityUtils
 from src.schemas.transaction import UserLogin, OTPVerify, APIKeyCreate, UserCreate
 from src.services.email_service import EmailService
@@ -214,36 +214,35 @@ class AuthService:
     
     @staticmethod
     def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
-        """Update user information safely with validation."""
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return None
-
-        allowed_fields = ["name", "role", "is_active", "email", "company_id"]
-
         try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return None
+
+            allowed_fields = ["name", "email", "role", "is_active"]
+
             for field in allowed_fields:
                 if field in update_data:
 
-                    # Validate unique email
-                    if field == "email":
-                        existing = db.query(User).filter(
-                            User.email == update_data["email"],
-                            User.id != user_id
-                        ).first()
-                        if existing:
-                            raise ValueError("Email already in use.")
+                    if field == "role":
+                        # Convert string to Enum safely
+                        try:
+                            value = RoleEnum(update_data["role"])
+                        except ValueError:
+                            raise ValueError("Invalid role")
+                        
+                        setattr(user, "role", value)
+                        continue
 
-                    # Apply other allowed fields
                     setattr(user, field, update_data[field])
 
             db.commit()
             db.refresh(user)
             return user
-
+        
         except Exception as e:
-            db.rollback()
-            raise e
+            db.rollback()     
+            raise e    
     
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:

@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 from typing import Literal, List, Any, Dict
 
 from src.core.constants import TransactionStatus, WithdrawalStatus
-
+from src.models.transaction import RoleEnum
 
 # -------------------------- BASE SCHEMAS -----------------------------------
 
@@ -192,7 +192,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
-    role: Optional[str] = None
+    role: Optional[RoleEnum] = None
     is_active: Optional[bool] = None
     email: Optional[EmailStr] 
     company_id: int
