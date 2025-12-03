@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from src.models.transaction import DepositTransaction, WithdrawalTransaction, AirtimePurchase
 
 from src.core.database import get_db
 from src.core.auth_dependencies import get_current_user, require_role
@@ -264,6 +265,37 @@ async def initiate_withdrawal(withdrawal: WithdrawalCreate, db: Session = Depend
         return result
     except Exception as e:
         raise HTTPException(status_code=429, detail=str(e))
+    
+
+# ---------- GET deposits ----------
+@transaction_router.get("/deposits", response_model=List[DepositTransaction])
+def get_deposits(
+    recipient: Optional[str] = Query(None),
+    partner_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    return get_deposit_transactions(db, recipient, partner_id, status)
+
+# ---------- GET withdrawals ----------
+@transaction_router.get("/withdrawals", response_model=List[WithdrawalTransaction])
+def get_withdrawals(
+    sender: Optional[str] = Query(None),
+    partner_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    return get_withdrawal_transactions(db, sender, partner_id, status)
+
+# ---------- GET airtime purchases ----------
+@transaction_router.get("/airtime", response_model=List[AirtimePurchase])
+def get_airtime(
+    recipient: Optional[str] = Query(None),
+    partner_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    return get_airtime_purchase_transactions(db, recipient, partner_id, status)
 
 @country_router.post("/", response_model=CountryResponse)
 def create(data: CountryCreate, db: Session = Depends(get_db)):

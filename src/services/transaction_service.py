@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from src.core.security import SecurityUtils
+from typing import List, Optional
 
 
 # MODELS
@@ -153,6 +154,56 @@ async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
 
     return {"message": "Airtime queued for execution.", "queue_id": pending.id}
 
+def get_deposit_transactions(
+    db: Session,
+    recipient: Optional[str] = None,
+    partner_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+) -> List[DepositTransaction]:
+    query = db.query(DepositTransaction)
+    if recipient:
+        query = query.filter(DepositTransaction.recipient == recipient)
+    if partner_id:
+        query = query.filter(DepositTransaction.partner_id == partner_id)
+    if status:
+        query = query.filter(DepositTransaction.status == status)
+    return query.order_by(DepositTransaction.id.desc()).limit(limit).offset(offset).all()
+
+def get_withdrawal_transactions(
+    db: Session,
+    sender: Optional[str] = None,
+    partner_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+) -> List[WithdrawalTransaction]:
+    query = db.query(WithdrawalTransaction)
+    if sender:
+        query = query.filter(WithdrawalTransaction.sender == sender)
+    if partner_id:
+        query = query.filter(WithdrawalTransaction.partner_id == partner_id)
+    if status:
+        query = query.filter(WithdrawalTransaction.status == status)
+    return query.order_by(WithdrawalTransaction.id.desc()).limit(limit).offset(offset).all()
+
+def get_airtime_purchase_transactions(
+    db: Session,
+    recipient: Optional[str] = None,
+    partner_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+) -> List[AirtimePurchase]:
+    query = db.query(AirtimePurchase)
+    if recipient:
+        query = query.filter(AirtimePurchase.recipient == recipient)
+    if partner_id:
+        query = query.filter(AirtimePurchase.partner_id == partner_id)
+    if status:
+        query = query.filter(AirtimePurchase.status == status)
+    return query.order_by(AirtimePurchase.id.desc()).limit(limit).offset(offset).all()
 
 def create_country(db: Session, data: CountryCreate):
     country = Country(**data.model_dump())
