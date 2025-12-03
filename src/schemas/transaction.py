@@ -191,11 +191,11 @@ class UserCreate(UserBase):
     password: str
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    role: Optional[RoleEnum] = None
-    is_active: Optional[bool] = None
-    email: Optional[EmailStr] 
-    company_id: int
+    name: Optional[str]
+    email: Optional[EmailStr]
+    role: Optional[str]
+    is_active: Optional[bool]
+    company_id: Optional[int]
 
 class UserResponse(BaseModel):
     id: int

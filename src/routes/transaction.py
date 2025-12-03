@@ -302,12 +302,18 @@ def retrieve_one(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "User not found")
     return user
 
-@user_router.put("/{user_id}", response_model=UserResponse)
-def update(user_id: int, data: UserUpdate, db: Session = Depends(get_db)):
-    updated = AuthService.update_user(db, user_id, data)
-    if not updated:
-        raise HTTPException(404, "User not found")
-    return updated
+@user_router.put("/{user_id}", response_model=UserUpdate)
+def update_user_endpoint(
+    user_id: int,
+    user_update: UserUpdate,
+    db: Session = Depends(get_db)
+):
+    update_data = user_update.model_dump(exclude_unset=True)  # only fields sent
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    user = AuthService.update_user(db, user_id, update_data)
+    return user
 
 @user_router.post("/change-password", response_model=PasswordChangeResponse)
 def change_password(

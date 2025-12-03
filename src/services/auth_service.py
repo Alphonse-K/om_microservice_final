@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, List, Any
-import os
+from fastapi import HTTPException
 
 from src.models.transaction import JWTBlacklist, OTPCode, APIKey, RefreshToken, User, RoleEnum
 from src.core.security import SecurityUtils
@@ -213,36 +213,35 @@ class AuthService:
         return db.query(User).filter(User.email == email).first()
     
     @staticmethod
-    def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
-        """Update user safely, including Enum handling for role."""
+    def update_user(db: Session, user_id: int, update_data: Dict) -> User:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        allowed_fields = ["name", "email", "role", "is_active", "company_id"]
+
+        for field in allowed_fields:
+            if field in update_data:
+                new_value = update_data[field]
+
+                if field == "role":
+                    role_input = str(new_value).upper()
+                    if role_input not in RoleEnum.__members__:
+                        raise HTTPException(status_code=400, detail=f"Invalid role: {new_value}")
+                    new_value = RoleEnum[role_input].value  # assign string
+
+                current_value = getattr(user, field)
+                if current_value != new_value:
+                    setattr(user, field, new_value)
+
         try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return None
-
-            allowed_fields = ["name", "email", "role", "is_active", "company_id"]
-
-            for field in allowed_fields:
-                if field in update_data:
-                    if field == "role":
-                        role_input = str(update_data["role"]).upper()
-                        if role_input not in RoleEnum.__members__:
-                            raise ValueError(f"Invalid role: {update_data['role']}")
-                        setattr(user, field, RoleEnum[role_input])  # Enum object
-                    else:
-                        setattr(user, field, update_data[field])
-                        
-            print("after:", user.__dict__)
-
-            db.add(user)
             db.commit()
             db.refresh(user)
             return user
-
         except Exception as e:
             db.rollback()
-            raise e
-
+            raise HTTPException(status_code=500, detail=str(e))
+        
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
         """Deactivate user (soft delete)"""
