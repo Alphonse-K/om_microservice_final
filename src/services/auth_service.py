@@ -214,34 +214,28 @@ class AuthService:
     
     @staticmethod
     def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
-        """Update user safely, including Enum handling."""
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return None
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None
 
-            # All fields that can be updated
-            allowed_fields = ["name", "email", "role", "is_active", "company_id"]
+        allowed_fields = ["name", "email", "role", "is_active", "company_id"]
 
-            for field in allowed_fields:
-                if field in update_data:
-                    if field == "role":
-                        # Map string to Enum (case-insensitive)
-                        try:
-                            value = RoleEnum[update_data["role"].upper()]
-                        except KeyError:
-                            raise ValueError(f"Invalid role: {update_data['role']}")
-                        setattr(user, field, value)
-                    else:
-                        setattr(user, field, update_data[field])
+        for field in allowed_fields:
+            if field in update_data:
+                if field == "role":
+                    # Convert string to Enum safely
+                    try:
+                        value = RoleEnum[update_data["role"].upper()]
+                    except KeyError:
+                        raise ValueError(f"Invalid role: {update_data['role']}")
+                    setattr(user, field, value)
+                else:
+                    setattr(user, field, update_data[field])
 
-            db.commit()
-            db.refresh(user)
-            return user
-
-        except Exception as e:
-            db.rollback()
-            raise e
+        db.add(user)          # <-- ensure SQLAlchemy tracks the object
+        db.commit()
+        db.refresh(user)
+        return user
 
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
