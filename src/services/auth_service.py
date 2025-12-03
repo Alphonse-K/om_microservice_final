@@ -231,7 +231,8 @@ class AuthService:
                     setattr(user, field, value)
                 else:
                     setattr(user, field, update_data[field])
-        print(user)
+        print("after:", user.__dict__)
+
         db.add(user)          # <-- ensure SQLAlchemy tracks the object
         db.commit()
         db.refresh(user)
