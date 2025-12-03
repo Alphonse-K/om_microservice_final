@@ -268,7 +268,7 @@ async def initiate_withdrawal(withdrawal: WithdrawalCreate, db: Session = Depend
     
 
 # ---------- GET deposits ----------
-@transaction_router.get("/deposits", response_model=List[DepositTransaction])
+@transaction_router.get("/deposits", response_model=List[DepositResponse])
 def get_deposits(
     recipient: Optional[str] = Query(None),
     partner_id: Optional[int] = Query(None),
@@ -278,7 +278,7 @@ def get_deposits(
     return get_deposit_transactions(db, recipient, partner_id, status)
 
 # ---------- GET withdrawals ----------
-@transaction_router.get("/withdrawals", response_model=List[WithdrawalTransaction])
+@transaction_router.get("/withdrawals", response_model=List[WithdrawalResponse])
 def get_withdrawals(
     sender: Optional[str] = Query(None),
     partner_id: Optional[int] = Query(None),
@@ -288,7 +288,7 @@ def get_withdrawals(
     return get_withdrawal_transactions(db, sender, partner_id, status)
 
 # ---------- GET airtime purchases ----------
-@transaction_router.get("/airtime", response_model=List[AirtimePurchase])
+@transaction_router.get("/airtime", response_model=List[AirtimeResponse])
 def get_airtime(
     recipient: Optional[str] = Query(None),
     partner_id: Optional[int] = Query(None),

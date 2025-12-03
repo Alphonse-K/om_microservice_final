@@ -44,35 +44,104 @@ class WithdrawalCreate(WithdrawalBase):
 class AirtimeCreate(AirtimeBase):
     pass 
 
-
 # -------------------------- RESPONSE SCHEMAS -------------------------------
 
-class DepositResponse(DepositBase):
+class DepositResponse(BaseModel):
     id: int
-    status: TransactionStatus
+    amount: Decimal
+    recipient: str
+    status: str
+
+    company_id: int
+    country_id: int
+    balance_id: int | None
+    pending_transaction_id: int | None
+
+    partner_code: str
+    service_partner_id: str | None
+
+    gateway_response: str | None
+    gateway_transaction_id: str | None
+    sim_used: str | None
+
+    fee_amount: Decimal
+    net_amount: Decimal
+
+    before_balance: Decimal | None
+    after_balance: Decimal | None
+
+    error_message: str | None
+
     created_at: datetime
-    validated_at: Optional[datetime] = None
+    validated_at: datetime | None
+    updated_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class WithdrawalResponse(BaseModel):
+    id: int
+    amount: Decimal
+    sender: str
+    status: str
+
+    company_id: int
+    country_id: int
+    balance_id: int | None
+    pending_transaction_id: int | None
+
+    partner_code: str
+    service_partner_id: str | None
+
+    gateway_response: str | None
+    gateway_transaction_id: str | None
+    sim_used: str | None
+
+    fee_amount: Decimal
+    net_amount: Decimal
+
+    before_balance: Decimal | None
+    after_balance: Decimal | None
+
+    error_message: str | None
+
+    created_at: datetime
+    validated_at: datetime | None
+    updated_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class WithdrawalResponse(WithdrawalBase):
+class AirtimeResponse(BaseModel):
     id: int
-    status: WithdrawalStatus
+    amount: Decimal
+    recipient: str
+    status: str
+
+    company_id: int
+    country_id: int
+    balance_id: int | None
+    pending_transaction_id: int | None
+
+    partner_code: str
+    service_partner_id: str | None
+
+    gateway_response: str | None
+    gateway_transaction_id: str | None
+    sim_used: str | None
+
+    fee_amount: Decimal
+    net_amount: Decimal
+
+    before_balance: Decimal | None
+    after_balance: Decimal | None
+
+    error_message: str | None
+
     created_at: datetime
-    validated_at: Optional[datetime] = None
+    validated_at: datetime | None
+    updated_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class AirtimeResponse(AirtimeBase):
-    id: int
-    status: TransactionStatus
-    created_at: datetime
-    validated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
 
 # ------------------------- GENERIC OPERATION RESPONSE -------------------------
 
