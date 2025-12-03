@@ -2,7 +2,7 @@
 import logging
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, List, Any
 import os
 
 from src.models.transaction import JWTBlacklist, OTPCode, APIKey, RefreshToken, User
@@ -197,6 +197,11 @@ class AuthService:
         logger.info(f"User created: {user.email} (ID: {user.id})")
         return user
     
+    @staticmethod
+    def list_users(db: Session) -> List[User]:
+        """Return all users"""
+        return db.query(User).all()
+
     @staticmethod
     def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
         """Get user by ID"""

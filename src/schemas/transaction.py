@@ -137,23 +137,6 @@ class CompanyStatsResponse(BaseModel):
     transaction_breakdown: Dict[str, int]
     recent_transactions: List[Dict[str, Any]] = []
 
-# class CompanyBalanceBase(BaseModel):
-#     company_id: int
-#     country_id: int
-#     balance: Decimal
-
-# class CompanyBalanceCreate(CompanyBalanceBase):
-#     pass
-
-# class CompanyBalanceUpdate(BaseModel):
-#     balance: Optional[Decimal] = None
-
-# class CompanyBalanceResponse(CompanyBalanceBase):
-#     id: int
-#     model_config = {"from_attributes": True}
-# from decimal import Decimal
-# from typing import Optional
-# from pydantic import BaseModel, Field, ConfigDict
 
 class CompanyBalanceBase(BaseModel):
     """Base schema for company country balance"""
