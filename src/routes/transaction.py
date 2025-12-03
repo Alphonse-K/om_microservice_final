@@ -297,7 +297,7 @@ def retrieve(db: Session = Depends(get_db)):
 
 @user_router.get("/{user_id}", response_model=UserResponse)
 def retrieve_one(user_id: int, db: Session = Depends(get_db)):
-    user = AuthService.get_user(db, user_id)
+    user = AuthService.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(404, "User not found")
     return user
