@@ -220,14 +220,15 @@ class AuthService:
             if not user:
                 return None
 
-            allowed_fields = ["name", "email" "role", "is_active"]
+            # Fix: add comma between 'email' and 'role'
+            allowed_fields = ["name", "email", "role", "is_active"]
 
             for field in allowed_fields:
                 if field in update_data:
                     if field == "role":
                         # Convert string to RoleEnum
                         try:
-                            value = RoleEnum(update_data["role"].upper())  # <-- important
+                            value = RoleEnum(update_data["role"].upper())
                         except ValueError:
                             raise ValueError(f"Invalid role: {update_data['role']}")
                         setattr(user, field, value)
@@ -241,7 +242,7 @@ class AuthService:
         except Exception as e:
             db.rollback()
             raise e
-    
+
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
         """Deactivate user (soft delete)"""
