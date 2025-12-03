@@ -231,11 +231,12 @@ class AuthService:
                     setattr(user, field, value)
                 else:
                     setattr(user, field, update_data[field])
-
+        print(user)
         db.add(user)          # <-- ensure SQLAlchemy tracks the object
         db.commit()
         db.refresh(user)
         return user
+
 
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
