@@ -214,22 +214,22 @@ class AuthService:
     
     @staticmethod
     def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
-        """Update user information safely with Enum support."""
+        """Update user safely, including Enum handling."""
         try:
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
                 return None
 
-            # Fix: add comma between 'email' and 'role'
-            allowed_fields = ["name", "email", "role", "is_active"]
+            # All fields that can be updated
+            allowed_fields = ["name", "email", "role", "is_active", "company_id"]
 
             for field in allowed_fields:
                 if field in update_data:
                     if field == "role":
-                        # Convert string to RoleEnum
+                        # Map string to Enum (case-insensitive)
                         try:
-                            value = RoleEnum(update_data["role"].upper())
-                        except ValueError:
+                            value = RoleEnum[update_data["role"].upper()]
+                        except KeyError:
                             raise ValueError(f"Invalid role: {update_data['role']}")
                         setattr(user, field, value)
                     else:
