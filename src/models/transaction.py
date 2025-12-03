@@ -41,7 +41,7 @@ class RoleEnum(str, Enum):
     ADMIN = "admin"
     CHECKER = "checker"
     USER = "user"
-    VIEWER = "Maker"
+    Maker = "maker"
 
 
 # ========== CORE MODELS ==========

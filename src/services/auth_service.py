@@ -214,35 +214,33 @@ class AuthService:
     
     @staticmethod
     def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
+        """Update user information safely with Enum support."""
         try:
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
                 return None
 
-            allowed_fields = ["name", "email", "role", "is_active"]
+            allowed_fields = ["name", "email" "role", "is_active"]
 
             for field in allowed_fields:
                 if field in update_data:
-
                     if field == "role":
-                        # Convert string to Enum safely
+                        # Convert string to RoleEnum
                         try:
-                            value = RoleEnum(update_data["role"])
+                            value = RoleEnum(update_data["role"].upper())  # <-- important
                         except ValueError:
-                            raise ValueError("Invalid role")
-                        
-                        setattr(user, "role", value)
-                        continue
-
-                    setattr(user, field, update_data[field])
+                            raise ValueError(f"Invalid role: {update_data['role']}")
+                        setattr(user, field, value)
+                    else:
+                        setattr(user, field, update_data[field])
 
             db.commit()
             db.refresh(user)
             return user
-        
+
         except Exception as e:
-            db.rollback()     
-            raise e    
+            db.rollback()
+            raise e
     
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
