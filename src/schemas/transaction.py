@@ -194,7 +194,9 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
-
+    email: Optional[EmailStr] 
+    password: Optional[str]
+    company_id: int
 
 class UserResponse(BaseModel):
     id: int

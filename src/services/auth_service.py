@@ -212,22 +212,48 @@ class AuthService:
         """Get user by email"""
         return db.query(User).filter(User.email == email).first()
     
-    @staticmethod
-    def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
-        """Update user information"""
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return None
-        
-        # Only allow certain fields to be updated
-        allowed_fields = ["name", "role", "is_active"]
+@staticmethod
+def update_user(db: Session, user_id: int, update_data: Dict[str, Any]) -> Optional[User]:
+    """Update user information safely with validation."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+
+    allowed_fields = ["name", "role", "is_active", "email", "password", "company_id"]
+
+    try:
         for field in allowed_fields:
             if field in update_data:
+
+                # Validate unique email
+                if field == "email":
+                    existing = db.query(User).filter(
+                        User.email == update_data["email"],
+                        User.id != user_id
+                    ).first()
+                    if existing:
+                        raise ValueError("Email already in use.")
+
+                # Password update: hash it
+                if field == "password":
+                    is_valid, message = SecurityUtils.validate_password_strength(update_data["password"])
+                    if not is_valid:
+                        raise ValueError(message)
+
+                    hashed = SecurityUtils.hash_password(update_data["password"])
+                    user.password_hash = hashed
+                    continue
+
+                # Apply other allowed fields
                 setattr(user, field, update_data[field])
-        
+
         db.commit()
         db.refresh(user)
         return user
+
+    except Exception as e:
+        db.rollback()
+        raise e
     
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
