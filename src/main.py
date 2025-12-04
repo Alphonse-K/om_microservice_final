@@ -4,7 +4,6 @@ from src.routes.transaction import (
     transaction_router, 
     country_router, 
     user_router,
-    balance_router, 
     fee_router, 
     procurement_router,
     company_router,
@@ -23,7 +22,7 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(company_router)  
 app.include_router(country_router)
-app.include_router(balance_router)
+app.include_router(finance_router)
 app.include_router(email_router) 
 
 app.include_router(fee_router)
