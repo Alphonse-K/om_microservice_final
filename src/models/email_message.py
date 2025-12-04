@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
-from datetime import datetime
+from datetime import datetime, timezone
 from src.core.database import Base
 
 
@@ -12,6 +12,8 @@ class EmailMessage(Base):
     subject = Column(String)
     sender = Column(String)
     body = Column(Text, nullable=False)
-    received_at = Column(DateTime, default=datetime.utcnow)
+    received_at = Column(DateTime, default=datetime.now(timezone.utc))
     parsed_transaction_id = Column(String, index=True, nullable=True)
     matched = Column(Boolean, default=False)
+
+

@@ -35,7 +35,7 @@ def get_companies(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     active_only: bool = Query(True, description="Return only active companies"),
-    current_user: User = Depends(require_role(["admin", "viewer"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -51,7 +51,7 @@ def get_companies(
 @company_router.get("/count", response_model=dict)
 def get_companies_count(
     active_only: bool = Query(True, description="Count only active companies"),
-    current_user: User = Depends(require_role(["admin", "viewer"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -82,7 +82,7 @@ def get_company(
 @company_router.post("/", response_model=CompanyResponse, status_code=201)
 def create_company(
     company_data: CompanyCreate,
-    current_user: User = Depends(require_role(["admin"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -109,7 +109,7 @@ def create_company(
 def update_company(
     company_id: int,
     update_data: CompanyUpdate,
-    current_user: User = Depends(require_role(["admin"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -135,7 +135,7 @@ def update_company(
 @company_router.delete("/{company_id}", status_code=200)
 def delete_company(
     company_id: int,
-    current_user: User = Depends(require_role(["admin"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -155,7 +155,7 @@ def delete_company(
 @company_router.post("/{company_id}/activate", response_model=CompanyResponse)
 def activate_company(
     company_id: int,
-    current_user: User = Depends(require_role(["admin"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -176,7 +176,7 @@ def activate_company(
 @company_router.get("/{company_id}/stats", response_model=CompanyStatsResponse)
 def get_company_stats(
     company_id: int,
-    current_user: User = Depends(require_role(["admin", "viewer", "maker", "checker"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER", "USER"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -206,7 +206,7 @@ def search_companies(
     q: str = Query(..., min_length=2, max_length=100, description="Search term"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(require_role(["admin", "viewer"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER", "USER"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -221,7 +221,7 @@ def search_companies(
 @company_router.get("/email/{email}", response_model=CompanyResponse)
 def get_company_by_email(
     email: str,
-    current_user: User = Depends(require_role(["admin", "viewer"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER", "USER"])),
     db: Session = Depends(get_db)
 ):
     """
