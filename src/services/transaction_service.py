@@ -235,8 +235,18 @@ def create_company(db: Session, data: CompanyCreate):
     db.refresh(company)
     return company
 
-def list_companies(db: Session):
-    return db.query(Company).all()
+def list_companies(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False
+):
+    query = db.query(Company)
+
+    if active_only:
+        query = query.filter(Company.is_active == True)
+
+    return query.offset(skip).limit(limit).all()
 
 def get_company(db: Session, company_id: int):
     return db.query(Company).filter(Company.id == company_id).first()
