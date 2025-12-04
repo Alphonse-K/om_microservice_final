@@ -13,7 +13,6 @@ from src.models.transaction import (
     Country,
     CompanyCountryBalance,
     Company,
-    User,
     FeeConfig,
     Procurement,
 )
@@ -29,8 +28,6 @@ from src.schemas.transaction import (
     CompanyBalanceUpdate,
     CompanyCreate,
     CompanyUpdate,
-    UserCreate,
-    UserUpdate,
     FeeConfigCreate,
     FeeConfigUpdate,
     ProcurementCreate,
@@ -154,6 +151,8 @@ async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
 
     return {"message": "Airtime queued for execution.", "queue_id": pending.id}
 
+# ++++++++++++++++++ GET REQUEST FOR DEPOSIT, AIRTIME, WITHDRAWAL +++++++++++++++++++++++++++++++++++++++++++
+
 def get_deposit_transactions(
     db: Session,
     recipient: Optional[str] = None,
@@ -205,6 +204,9 @@ def get_airtime_purchase_transactions(
         query = query.filter(AirtimePurchase.status == status)
     return query.order_by(AirtimePurchase.id.desc()).limit(limit).offset(offset).all()
 
+
+# ++++++++++++++++++ COUNTRY SERVICE LAYER +++++++++++++++++++++++++++++++++++++++++++
+
 def create_country(db: Session, data: CountryCreate):
     country = Country(**data.model_dump())
     db.add(country)
@@ -227,6 +229,9 @@ def update_country(db: Session, country_id: int, data: CountryUpdate):
     db.commit()
     db.refresh(country)
     return country
+
+
+# ++++++++++++++++++ COMPANY SERVICE LAYER +++++++++++++++++++++++++++++++++++++++++++
 
 def create_company(db: Session, data: CompanyCreate):
     company = Company(**data.model_dump())
@@ -263,30 +268,7 @@ def update_company(db: Session, company_id: int, data: CompanyUpdate):
     db.refresh(company)
     return company
 
-def create_balance(db: Session, data: CompanyBalanceCreate):
-    balance = CompanyCountryBalance(**data.model_dump())
-    db.add(balance)
-    db.commit()
-    db.refresh(balance)
-    return balance
-
-def list_balances(db: Session):
-    return db.query(CompanyCountryBalance).all()
-
-def get_balance(db: Session, balance_id: int):
-    return db.query(CompanyCountryBalance).filter(CompanyCountryBalance.id == balance_id).first()
-
-def update_balance(db: Session, balance_id: int, data: CompanyBalanceUpdate):
-    balance = get_balance(db, balance_id)
-    if not balance:
-        return None
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(balance, key, value)
-
-    db.commit()
-    db.refresh(balance)
-    return balance
+# ++++++++++++++++++ FEE SERVICE LAYER +++++++++++++++++++++++++++++++++++++++++++
 
 def create_fee_config(db: Session, data: FeeConfigCreate):
     config = FeeConfig(**data.model_dump())
@@ -310,32 +292,4 @@ def update_fee_config(db: Session, config_id: int, data: FeeConfigUpdate):
     db.commit()
     db.refresh(config)
     return config
-
-def create_procurement(db: Session, data: ProcurementCreate, file_path: str | None = None):
-    procurement = Procurement(
-        **data.model_dump(),
-        slip_file_path=file_path
-    )
-    db.add(procurement)
-    db.commit()
-    db.refresh(procurement)
-    return procurement
-
-def list_procurements(db: Session):
-    return db.query(Procurement).all()
-
-def get_procurement(db: Session, procurement_id: int):
-    return db.query(Procurement).filter(Procurement.id == procurement_id).first()
-
-def update_procurement(db: Session, procurement_id: int, data: ProcurementUpdate):
-    proc = get_procurement(db, procurement_id)
-    if not proc:
-        return None
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(proc, key, value)
-
-    db.commit()
-    db.refresh(proc)
-    return proc
 

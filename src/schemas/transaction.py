@@ -57,7 +57,7 @@ class DepositResponse(BaseModel):
     balance_id: int | None
     pending_transaction_id: int | None
 
-    partner_code: str
+    partner_id: str
     service_partner_id: str | None
 
     gateway_response: str | None
@@ -89,7 +89,7 @@ class WithdrawalResponse(BaseModel):
     balance_id: int | None
     pending_transaction_id: int | None
 
-    partner_code: str
+    partner_id: str
     service_partner_id: str | None
 
     gateway_response: str | None
@@ -122,7 +122,7 @@ class AirtimeResponse(BaseModel):
     balance_id: int | None
     pending_transaction_id: int | None
 
-    partner_code: str
+    partner_id: str
     service_partner_id: str | None
 
     gateway_response: str | None
@@ -358,6 +358,46 @@ class ProcurementUpdate(BaseModel):
     validation_date: Optional[datetime] = None
     status: Optional[str] = None
 
+# In your schemas, add these:
+class ProcurementAction(BaseModel):
+    """Schema for procurement approve/reject actions"""
+    notes: Optional[str] = Field(None, max_length=500, description="Action notes")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "notes": "Slip verified successfully"
+            }
+        }
+    )
+
+class ProcurementResponse(BaseModel):
+    """Enhanced response with balance info"""
+    id: int = Field(..., example=1)
+    company_id: int
+    country_id: int
+    balance_id: Optional[int]
+    bank_name: str
+    slip_number: str
+    amount: Decimal
+    status: str
+    initiation_date: datetime
+    validation_date: Optional[datetime]
+    slip_file_path: Optional[str]
+    initiated_by: Optional[int]
+    validated_by: Optional[int]
+    notes: Optional[str]
+    
+    # Balance information
+    available_balance: Optional[Decimal] = Field(None, description="Balance after approval")
+    
+    model_config = {
+        "from_attributes": True,
+        "json_encoders": {
+            Decimal: str,
+            datetime: lambda v: v.isoformat()
+        }
+    }
 
 class ProcurementResponse(ProcurementBase):
     id: int = Field(..., example=1)
@@ -526,3 +566,32 @@ class OTPResponse(BaseModel):
     }
 
 
+# Add to your schemas in transaction.py
+class BalanceSummaryResponse(BaseModel):
+    """Response model for balance summary"""
+    company_id: int
+    total_available: Decimal
+    total_held: Decimal
+    total_effective: Decimal
+    country_balances: List[Dict]
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "company_id": 1,
+                "total_available": "50000.00",
+                "total_held": "15000.00",
+                "total_effective": "35000.00",
+                "country_balances": [
+                    {
+                        "country_id": 84,
+                        "country_name": "Iran",
+                        "partner_code": "COM-IRN",
+                        "available_balance": "20000.00",
+                        "held_balance": "5000.00",
+                        "effective_balance": "15000.00"
+                    }
+                ]
+            }
+        }
+    )

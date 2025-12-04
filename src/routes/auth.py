@@ -178,7 +178,7 @@ def logout_all(
 @auth_router.post("/api-keys", response_model=APIKeyResponse)
 def create_api_key(
     create_data: APIKeyCreate,
-    current_user: User = Depends(require_role(["admin", "maker"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -201,7 +201,7 @@ def list_api_keys(
 @auth_router.delete("/api-keys/{key_id}")
 def revoke_api_key(
     key_id: int,
-    current_user: User = Depends(require_role(["admin", "maker"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """

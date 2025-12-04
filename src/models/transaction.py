@@ -245,20 +245,36 @@ class Procurement(Base):
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
-
+    
+    # Add balance_id field
+    balance_id = Column(Integer, ForeignKey("company_country_balances.id"), nullable=True)
+    
     bank_name = Column(String(255), nullable=False)
     slip_number = Column(String(255), nullable=False, unique=True)
     slip_file_path = Column(String(500), nullable=True)
 
     initiation_date = Column(DateTime(timezone=True), server_default=func.now())
     validation_date = Column(DateTime(timezone=True), nullable=True)
+    
+    # Add who initiated and validated
+    initiated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    validated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     amount = Column(Numeric(18, 2), nullable=False)
     status = Column(SAEnum(ProcurementStatus), default=ProcurementStatus.PENDING)
+    notes = Column(String(1000), nullable=True)
 
+    # Relationships
     company = relationship("Company", back_populates="procurements")
     country = relationship("Country", back_populates="procurements")
-
+    balance = relationship("CompanyCountryBalance")
+    initiator_user = relationship("User", foreign_keys=[initiated_by])
+    validator_user = relationship("User", foreign_keys=[validated_by])
+    
+    __table_args__ = (
+        Index('ix_procurement_company_country', 'company_id', 'country_id'),
+        Index('ix_procurement_status', 'status'),
+    )
 
 # ========== DEPOSIT TRANSACTION ==========
 class DepositTransaction(Base):
@@ -279,7 +295,7 @@ class DepositTransaction(Base):
     pending_transaction_id = Column(Integer, ForeignKey("pending_transactions.id"), nullable=True)
     
     # Partner info
-    partner_code = Column(String(100), nullable=False)
+    partner_id = Column(String(100), nullable=False)
     service_partner_id = Column(String(100), nullable=True)
     
     # Gateway fields
@@ -329,7 +345,7 @@ class WithdrawalTransaction(Base):
     pending_transaction_id = Column(Integer, ForeignKey("pending_transactions.id"), nullable=True)
     
     # Partner info
-    partner_code = Column(String(100), nullable=False)
+    partner_id = Column(String(100), nullable=False)
     service_partner_id = Column(String(100), nullable=True)
     
     # Gateway fields
@@ -379,7 +395,7 @@ class AirtimePurchase(Base):
     pending_transaction_id = Column(Integer, ForeignKey("pending_transactions.id"), nullable=True)
     
     # Partner info
-    partner_code = Column(String(100), nullable=False)
+    partner_id = Column(String(100), nullable=False)
     service_partner_id = Column(String(100), nullable=True)
     
     # Gateway fields
@@ -418,7 +434,7 @@ class PendingTransaction(Base):
     transaction_type = Column(String(20), nullable=False)
     msisdn = Column(String(20), nullable=False)
     amount = Column(Numeric(14, 2), nullable=False)
-    partner_code = Column(String(100), nullable=False)
+    partner_id = Column(String(100), nullable=False)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     country_iso = Column(String(3), nullable=True)
     status = Column(String(20), default="pending")
