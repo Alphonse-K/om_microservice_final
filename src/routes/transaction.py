@@ -40,13 +40,13 @@ def get_companies(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     active_only: bool = Query(True, description="Return only active companies"),
-    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER"])),
+    current_user: User = Depends(require_role(["ADMIN"])),  
     db: Session = Depends(get_db)
 ):
     """
     Get all companies.
     
-    - **admin** and **viewer** roles can access
+    - Only **admin** role can access all companies
     - Supports pagination
     - Can filter by active status
     """
@@ -54,9 +54,9 @@ def get_companies(
     return companies
 
 @company_router.get("/count", response_model=dict)
-def get_companies_count(
+def get_companies_count_endpoint(
     active_only: bool = Query(True, description="Count only active companies"),
-    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER"])),
+    current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
 ):
     """
@@ -66,7 +66,7 @@ def get_companies_count(
     return {"total": count}
 
 @company_router.get("/{company_id}", response_model=CompanyResponse)
-def get_company(
+def get_company_endpoint(
     company_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -74,9 +74,17 @@ def get_company(
     """
     Get a specific company by ID.
     
-    - All authenticated users can access
+    - Users can only access their own company
+    - Admins can access any company
     """
-    company = get_company(db, company_id)
+    # Check if user has permission
+    if current_user.role != "ADMIN" and current_user.company_id != company_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own company"
+        )
+    
+    company = get_company_by_id(db, company_id)
     if not company:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -85,7 +93,7 @@ def get_company(
     return company
 
 @company_router.post("/", response_model=CompanyResponse, status_code=201)
-def create_company(
+def create_company_endpoint(
     company_data: CompanyCreate,
     current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
@@ -97,7 +105,7 @@ def create_company(
     - Email and name must be unique
     """
     try:
-        company = create_company(db, company_data)
+        company = create_a_company(db, company_data)
         return company
     except ValueError as e:
         raise HTTPException(
@@ -111,7 +119,7 @@ def create_company(
         )
 
 @company_router.put("/{company_id}", response_model=CompanyResponse)
-def update_company(
+def update_company_endpoint(
     company_id: int,
     update_data: CompanyUpdate,
     current_user: User = Depends(require_role(["ADMIN"])),
@@ -124,7 +132,7 @@ def update_company(
     - Partial updates are supported
     """
     try:
-        company = update_company(db, company_id, update_data)
+        company = update_a_company(db, company_id, update_data)
         if not company:
             raise HTTPException(
                 status_code=404,
@@ -136,9 +144,14 @@ def update_company(
             status_code=400,
             detail=str(e)
         )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating company: {str(e)}"
+        )
 
 @company_router.delete("/{company_id}", status_code=200)
-def delete_company(
+def delete_company_endpoint(
     company_id: int,
     current_user: User = Depends(require_role(["ADMIN"])),
     db: Session = Depends(get_db)
@@ -149,7 +162,7 @@ def delete_company(
     - Only **admin** role can delete companies
     - This is a soft delete (sets is_active = False)
     """
-    success = delete_company(db, company_id)
+    success = delete_a_company(db, company_id)
     if not success:
         raise HTTPException(
             status_code=404,
@@ -158,9 +171,9 @@ def delete_company(
     return {"message": f"Company {company_id} deactivated successfully"}
 
 @company_router.post("/{company_id}/activate", response_model=CompanyResponse)
-def activate_company(
+def activate_company_endpoint(
     company_id: int,
-    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER"])),
+    current_user: User = Depends(require_role(["ADMIN"])),  # Only ADMIN can activate
     db: Session = Depends(get_db)
 ):
     """
@@ -168,30 +181,30 @@ def activate_company(
     
     - Only **admin** role can activate companies
     """
-    success = activate_company(db, company_id)
+    success = activate_a_company(db, company_id)
     if not success:
         raise HTTPException(
             status_code=404,
             detail=f"Company with ID {company_id} not found"
         )
     
-    company = get_company(db, company_id)
+    company = get_company_by_id(db, company_id)
     return company
 
 @company_router.get("/{company_id}/stats", response_model=CompanyStatsResponse)
-def get_company_stats(
+def get_company_stats_endpoint(
     company_id: int,
-    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER", "USER"])),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get statistics for a company.
     
-    - All authenticated users with any role can access their own company stats
+    - Users can only view their own company stats
     - **admin** can access any company stats
     """
     # Check if user has permission to view this company's stats
-    if current_user.role != "admin" and current_user.company_id != company_id:
+    if current_user.role != "ADMIN" and current_user.company_id != company_id:
         raise HTTPException(
             status_code=403,
             detail="You can only view statistics for your own company"
@@ -207,32 +220,32 @@ def get_company_stats(
     return stats
 
 @company_router.get("/search/", response_model=List[CompanyResponse])
-def search_companies(
+def search_companies_endpoint(
     q: str = Query(..., min_length=2, max_length=100, description="Search term"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER", "USER"])),
+    current_user: User = Depends(require_role(["ADMIN"])),  # Only ADMIN can search all
     db: Session = Depends(get_db)
 ):
     """
     Search companies by name, email, or phone.
     
-    - **admin** and **viewer** roles can search
+    - Only **admin** role can search all companies
     - Minimum 2 characters required for search term
     """
     companies = search_companies(db, q, skip=skip, limit=limit)
     return companies
 
 @company_router.get("/email/{email}", response_model=CompanyResponse)
-def get_company_by_email(
+def get_company_by_email_endpoint(
     email: str,
-    current_user: User = Depends(require_role(["ADMIN", "MAKER", "CHECKER", "USER"])),
+    current_user: User = Depends(require_role(["ADMIN"])),  # Only ADMIN can search by email
     db: Session = Depends(get_db)
 ):
     """
     Get company by email.
     
-    - **admin** and **viewer** roles can access
+    - Only **admin** role can access
     """
     company = get_company_by_email(db, email)
     if not company:
@@ -241,8 +254,6 @@ def get_company_by_email(
             detail=f"Company with email {email} not found"
         )
     return company
-
-# ==================== EXISTING ENDPOINTS (Keep as is) ====================
 
 # ---------------------- DEPOSIT ----------------------
 @transaction_router.post("/send/orange-money/", response_model=DepositResponse)
