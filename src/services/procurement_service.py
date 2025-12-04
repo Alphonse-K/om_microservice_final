@@ -39,15 +39,16 @@ class ProcurementService:
             if existing:
                 raise ValueError(f"Slip number '{procurement_data.slip_number}' already exists")
             
-            # Create procurement
+            data = procurement_data.model_dump(exclude={"slip_file_path"})
+
             procurement = Procurement(
-                **procurement_data.model_dump(),
+                **data,
                 slip_file_path=file_path,
                 status=ProcurementStatus.PENDING,
                 initiated_by=initiated_by_user_id,
                 initiation_date=datetime.now(timezone.utc)
             )
-            
+
             db.add(procurement)
             db.commit()
             db.refresh(procurement)
