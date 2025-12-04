@@ -1,5 +1,7 @@
 # src/routes/transactions.py (update your existing file)
 import os
+import json
+
 import logging
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, status, Form
 from sqlalchemy.orm import Session
@@ -493,58 +495,48 @@ def update(config_id: int, data: FeeConfigUpdate, db: Session = Depends(get_db))
 @procurement_router.post("/", response_model=ProcurementResponse)
 async def create_procurement_endpoint(
     data: str = Form(...),
+    slip: UploadFile = File(None),
     current_user: User = Depends(require_role(["ADMIN", "MAKER"])),
-    db: Session = Depends(get_db),
-    slip: UploadFile = File(None)
+    db: Session = Depends(get_db)
 ):
-    """
-    Create a new procurement
-    
-    - Requires ADMIN or MAKER role
-    - Creates procurement in PENDING status
-    - Balance is NOT updated until approved
-    """
     try:
+        # ✅ Parse JSON manually!
+        parsed_data = ProcurementCreate(**json.loads(data))
+
         # Ensure procurement is for user's company
-        # Only admins can create for other companies
-        if current_user.role != "ADMIN" and current_user.company_id != data.company_id:
+        if current_user.role != "ADMIN" and current_user.company_id != parsed_data.company_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only create procurements for your own company"
             )
-        
+
         file_path = None
         if slip:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"{timestamp}_{slip.filename}"
             file_path = f"{UPLOAD_DIR}/{filename}"
+
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
-            # Save file
             with open(file_path, "wb") as f:
-                content = await slip.read()
-                f.write(content)
-        
-        # Import the service
+                f.write(await slip.read())
+
         from src.services.procurement_service import ProcurementService
-        
+
         procurement = ProcurementService.create_procurement(
             db=db,
-            procurement_data=data,
+            procurement_data=parsed_data,
             initiated_by_user_id=current_user.id,
             file_path=file_path
         )
-        return procurement
         
+        return procurement
+
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating procurement: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"Failed to create procurement: {str(e)}"
         )
 
