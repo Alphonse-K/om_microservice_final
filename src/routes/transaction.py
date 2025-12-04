@@ -1,7 +1,7 @@
 # src/routes/transactions.py (update your existing file)
 import os
 import logging
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, status
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, status, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from src.models.transaction import User, ProcurementStatus
@@ -492,7 +492,7 @@ def update(config_id: int, data: FeeConfigUpdate, db: Session = Depends(get_db))
 
 @procurement_router.post("/", response_model=ProcurementResponse)
 async def create_procurement_endpoint(
-    data: ProcurementCreate,
+    data: str = Form(...),
     current_user: User = Depends(require_role(["ADMIN", "MAKER"])),
     db: Session = Depends(get_db),
     slip: UploadFile = File(None)
