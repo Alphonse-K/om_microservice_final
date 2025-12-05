@@ -363,7 +363,6 @@ class AuthService:
             "jti": jti
         }
 
-
     @staticmethod
     def validate_access_token(db: Session, token: str) -> Optional[User]:
         """
@@ -396,45 +395,46 @@ class AuthService:
     @staticmethod
     def refresh_tokens(db: Session, refresh_token: str, device_info: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
         """
-        Refresh access token using refresh token.
-        Invalidates old refresh token.
+        Refresh access token using a hashed refresh token.
+        Invalidates old refresh token and returns new tokens.
         """
-        # 1. Verify refresh token
+        # Verify JWT refresh token
         payload = SecurityUtils.verify_refresh_token(refresh_token)
-        if not payload:
+        if not payload or "sub" not in payload:
             return None
-        
-        user_id = payload.get("sub")
-        if not user_id:
-            return None
-        
-        # 2. Find refresh token in DB
-        hashed_token = SecurityUtils.hash_refresh_token(refresh_token)
-        token_record = db.query(RefreshToken).filter(
-            RefreshToken.token == hashed_token,
+
+        user_id = payload["sub"]
+
+        # Find all active, non-expired refresh tokens for this user
+        now = datetime.now(timezone.utc)
+        tokens = db.query(RefreshToken).filter(
+            RefreshToken.user_id == user_id,
             RefreshToken.is_active == True,
-            RefreshToken.expires_at > datetime.now(timezone.utc)
-        ).first()
-        
+            RefreshToken.expires_at > now
+        ).all()
+
+        # Match the provided token against stored hashed tokens
+        token_record = None
+        for t in tokens:
+            if SecurityUtils.verify_refresh_token_hash(refresh_token, t.token):
+                token_record = t
+                break
+
         if not token_record:
             return None
-        
-        # 3. Get user
-        user = db.query(User).filter(
-            User.id == int(user_id),
-            User.is_active == True
-        ).first()
-        
+
+        # Fetch user
+        user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
         if not user:
             return None
-        
-        # 4. Invalidate old refresh token
-        token_record.is_active = False
-        db.commit()  # <-- REQUIRED
 
-        # 5. Create new tokens
+        # Invalidate old refresh token
+        token_record.is_active = False
+        db.commit()
+
+        # Create new access + refresh tokens
         return AuthService.create_tokens(db, user, device_info)
-    
+
     @staticmethod
     def logout_user(db: Session, token: str, reason: str = "logout") -> bool:
         """

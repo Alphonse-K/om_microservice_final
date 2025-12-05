@@ -104,7 +104,6 @@ def verify_otp(
         }
     }
 
-
 @auth_router.post("/refresh", response_model=TokenResponse)
 def refresh_tokens(
     refresh_data: RefreshTokenRequest,
@@ -115,13 +114,13 @@ def refresh_tokens(
     Refresh access token using a valid refresh token.
     Invalidates the old refresh token and returns new tokens.
     """
-    # Extract device info from request
+    # Device info
     device_info = {
         "user_agent": request.headers.get("user-agent"),
         "ip_address": request.client.host if request.client else None
     }
 
-    # Refresh tokens via AuthService
+    # Refresh tokens
     tokens = AuthService.refresh_tokens(db, refresh_data.refresh_token, device_info)
     if not tokens:
         raise HTTPException(
@@ -129,7 +128,7 @@ def refresh_tokens(
             detail="Invalid or expired refresh token"
         )
 
-    # Get user info from new token payload
+    # Get user info from new access token
     payload = SecurityUtils.verify_access_token(tokens["access_token"])
     if not payload or "sub" not in payload:
         raise HTTPException(
@@ -144,7 +143,7 @@ def refresh_tokens(
             detail="User not found"
         )
 
-    # Return clean response with new tokens + user info
+    # Return response
     return {
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
@@ -158,7 +157,6 @@ def refresh_tokens(
             "company_id": user.company_id
         }
     }
-
 
 @auth_router.post("/logout", response_model=LogoutResponse)
 def logout(
