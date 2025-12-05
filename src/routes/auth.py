@@ -6,6 +6,7 @@ from src.core.security import SecurityUtils
 from src.services.auth_service import AuthService
 from src.schemas.transaction import *
 from src.models.transaction import User
+from datetime import timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,46 +17,82 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 def login(
     login_data: UserLogin, 
     db: Session = Depends(get_db),
-    request: Request = None  # Add request parameter
+    request: Request = None
 ):
-    """
-    Step 1: Login with email and password to receive OTP via email
-    """
-    # Get client IP for login notification
     client_ip = "Unknown"
     if request:
         if request.client:
             client_ip = request.client.host
-        # Check for X-Forwarded-For header
         forwarded_for = request.headers.get("X-Forwarded-For")
         if forwarded_for:
             client_ip = forwarded_for.split(",")[0].strip()
-    
-    # Authenticate user with IP address
+
+    # 1. Authenticate user by email + password
     user = AuthService.authenticate_user(db, login_data, ip_address=client_ip)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
-    
-    # Generate and send OTP via email
+        raise HTTPException(401, "Invalid credentials")
+
+    # 2. Device + IP from headers
+    user_agent = request.headers.get("user-agent")
+
+    # 3. Check if OTP is required
+    if not AuthService.is_otp_required(user, client_ip, user_agent):
+        return {
+            "message": "No OTP required. Login successful.",
+            "otp_required": False
+        }
+
+    # 4. OTP is required → generate
     otp_code = AuthService.generate_otp(db, user, "login")
-    
-    # Prepare response
-    response_data = {
+
+    return {
         "message": "OTP sent to your registered email",
-        "expires_in": 600  # 10 minutes
+        "expires_in": 600,
+        "otp_required": True,
+        "debug_info": {
+            "email": user.email,
+            "otp_code": otp_code,
+            "client_ip": client_ip
+        }
     }
+
+# @auth_router.post("/verify-otp", response_model=TokenResponse)
+# def verify_otp(
+#     verify_data: OTPVerify, 
+#     request: Request,
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Step 2: Verify OTP to receive JWT tokens
+#     """
+#     user = AuthService.verify_otp(db, verify_data, "login")
+#     if not user:
+#         raise HTTPException(
+#             status_code=status.HTTP_401_UNAUTHORIZED,
+#             detail="Invalid or expired OTP"
+#         )
     
-    response_data["debug_info"] = {
-        "email": user.email,
-        "otp_code": otp_code,
-        "user_id": user.id,
-        "client_ip": client_ip
-    }
+#     # Extract device info
+#     device_info = {
+#         "user_agent": request.headers.get("user-agent"),
+#         "ip_address": request.client.host if request.client else None
+#     }
     
-    return response_data
+#     tokens = AuthService.create_tokens(db, user, device_info)
+    
+#     return {
+#         "access_token": tokens["access_token"],
+#         "refresh_token": tokens["refresh_token"],
+#         "token_type": "bearer",
+#         "expires_at": tokens["expires_at"],
+#         "user": {
+#             "id": user.id,
+#             "email": user.email,
+#             "name": user.name,
+#             "role": user.role,
+#             "company_id": user.company_id
+#         }
+#     }
 
 @auth_router.post("/verify-otp", response_model=TokenResponse)
 def verify_otp(
@@ -66,6 +103,7 @@ def verify_otp(
     """
     Step 2: Verify OTP to receive JWT tokens
     """
+    # 1. Verify OTP
     user = AuthService.verify_otp(db, verify_data, "login")
     if not user:
         raise HTTPException(
@@ -73,14 +111,22 @@ def verify_otp(
             detail="Invalid or expired OTP"
         )
     
-    # Extract device info
+    # 2. Extract device info
     device_info = {
         "user_agent": request.headers.get("user-agent"),
         "ip_address": request.client.host if request.client else None
     }
-    
+
+    # 3. UPDATE last login metadata (PUT THIS HERE)
+    user.last_login = datetime.now(timezone.utc)
+    user.last_login_ip = device_info["ip_address"]
+    user.last_login_user_agent = device_info["user_agent"]
+    db.commit()  # <-- REQUIRED to persist the login metadata
+
+    # 4. Create tokens
     tokens = AuthService.create_tokens(db, user, device_info)
     
+    # 5. Return token response
     return {
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
@@ -94,6 +140,7 @@ def verify_otp(
             "company_id": user.company_id
         }
     }
+
 
 @auth_router.post("/refresh", response_model=TokenResponse)
 def refresh_tokens(

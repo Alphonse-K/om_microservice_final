@@ -59,7 +59,37 @@ class AuthService:
         except Exception as e:
             logger.error(f"Authentication error: {str(e)}")
             return None
-    
+        
+    @staticmethod
+    def is_otp_required(user, current_ip: str, current_ua: str) -> bool:
+        """
+        OTP is required if:
+            - First login ever
+            - OR last login >= 24 hours ago
+            - OR client IP address changed
+            - OR device (user-agent) changed
+        """
+
+        # 1. First-time login
+        if not user.last_login:
+            return True
+
+        # 2. Last login >= 24 hours
+        now = datetime.now(timezone.utc)
+        if now - user.last_login >= timedelta(hours=24):
+            return True
+
+        # 3. IP address changed
+        if user.last_login_ip and user.last_login_ip != current_ip:
+            return True
+
+        # 4. Device (User-Agent) changed
+        if user.last_login_user_agent and user.last_login_user_agent != current_ua:
+            return True
+
+        # Otherwise no OTP required
+        return False
+
     @staticmethod
     def generate_otp(db: Session, user: User, otp_type: str = "login") -> str:
         """

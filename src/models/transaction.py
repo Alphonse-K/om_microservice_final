@@ -104,6 +104,10 @@ class User(Base):
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    last_login_ip = Column(String, nullable=True)
+    last_login_user_agent = Column(String, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
