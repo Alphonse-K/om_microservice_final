@@ -56,43 +56,6 @@ def login(
         }
     }
 
-# @auth_router.post("/verify-otp", response_model=TokenResponse)
-# def verify_otp(
-#     verify_data: OTPVerify, 
-#     request: Request,
-#     db: Session = Depends(get_db)
-# ):
-#     """
-#     Step 2: Verify OTP to receive JWT tokens
-#     """
-#     user = AuthService.verify_otp(db, verify_data, "login")
-#     if not user:
-#         raise HTTPException(
-#             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail="Invalid or expired OTP"
-#         )
-    
-#     # Extract device info
-#     device_info = {
-#         "user_agent": request.headers.get("user-agent"),
-#         "ip_address": request.client.host if request.client else None
-#     }
-    
-#     tokens = AuthService.create_tokens(db, user, device_info)
-    
-#     return {
-#         "access_token": tokens["access_token"],
-#         "refresh_token": tokens["refresh_token"],
-#         "token_type": "bearer",
-#         "expires_at": tokens["expires_at"],
-#         "user": {
-#             "id": user.id,
-#             "email": user.email,
-#             "name": user.name,
-#             "role": user.role,
-#             "company_id": user.company_id
-#         }
-#     }
 
 @auth_router.post("/verify-otp", response_model=TokenResponse)
 def verify_otp(
@@ -117,11 +80,11 @@ def verify_otp(
         "ip_address": request.client.host if request.client else None
     }
 
-    # 3. UPDATE last login metadata (PUT THIS HERE)
+    # Step 3: UPDATE last login metadata
     user.last_login = datetime.now(timezone.utc)
     user.last_login_ip = device_info["ip_address"]
     user.last_login_user_agent = device_info["user_agent"]
-    db.commit()  # <-- REQUIRED to persist the login metadata
+    db.commit()
 
     # 4. Create tokens
     tokens = AuthService.create_tokens(db, user, device_info)

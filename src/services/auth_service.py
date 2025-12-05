@@ -21,7 +21,8 @@ class AuthService:
         ip_address: str = ""
     ) -> Optional[User]:
         """
-        Authenticate user with email and password
+        Authenticate user with email and password.
+        DOES NOT update last_login here.
         """
         try:
             user = db.query(User).filter(
@@ -37,13 +38,8 @@ class AuthService:
                 logger.warning(f"Login attempt failed: Invalid password for user {user.email}")
                 return None
             
-            # Update last login time
-            user.last_login = datetime.now(timezone.utc)
-            db.commit()
-            
-            # Send login notification email (async to avoid blocking)
+            # Send login notification email (optional, async)
             try:
-                # Get user agent from somewhere or pass it as parameter
                 EmailService.send_login_notification(
                     user.email,
                     user.name,
@@ -59,7 +55,8 @@ class AuthService:
         except Exception as e:
             logger.error(f"Authentication error: {str(e)}")
             return None
-        
+
+
     @staticmethod
     def is_otp_required(user, current_ip: str, current_ua: str) -> bool:
         """
@@ -149,6 +146,7 @@ class AuthService:
         
         logger.info(f"=== END generate_otp for user: {user.email} ===")
         return otp_code
+
 
     @staticmethod
     def verify_otp(db: Session, verify_data: OTPVerify, otp_type: str = "login") -> Optional[User]:
@@ -329,11 +327,49 @@ class AuthService:
         return True
     
     # ==================== TOKEN MANAGEMENT ====================
+    # @staticmethod
+    # def create_tokens(db: Session, user: User, device_info: Dict[str, Any] = None) -> Dict[str, Any]:
+    #     """
+    #     Create access and refresh tokens for user.
+    #     Updates last login time.
+    #     """
+    #     token_data = {
+    #         "sub": str(user.id),
+    #         "email": user.email,
+    #         "company_id": user.company_id,
+    #         "role": user.role
+    #     }
+        
+    #     # Create tokens
+    #     access_token, expires_at, jti = SecurityUtils.create_access_token(token_data)
+    #     refresh_token, refresh_expires_at = SecurityUtils.create_refresh_token(token_data)
+        
+    #     # Store refresh token
+    #     hashed_refresh_token = SecurityUtils.hash_refresh_token(refresh_token)
+    #     refresh_token_record = RefreshToken(
+    #         user_id=user.id,
+    #         token=hashed_refresh_token,
+    #         device_info=device_info,
+    #         expires_at=refresh_expires_at
+    #     )
+        
+    #     db.add(refresh_token_record)
+        
+    #     # Update last login
+    #     user.last_login = datetime.now(timezone.utc)
+    #     db.commit()
+        
+    #     return {
+    #         "access_token": access_token,
+    #         "refresh_token": refresh_token,
+    #         "expires_at": expires_at,
+    #         "jti": jti
+    #     }
     @staticmethod
     def create_tokens(db: Session, user: User, device_info: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Create access and refresh tokens for user.
-        Updates last login time.
+        Does NOT update last_login here.
         """
         token_data = {
             "sub": str(user.id),
@@ -342,11 +378,11 @@ class AuthService:
             "role": user.role
         }
         
-        # Create tokens
+        # Create JWTs
         access_token, expires_at, jti = SecurityUtils.create_access_token(token_data)
         refresh_token, refresh_expires_at = SecurityUtils.create_refresh_token(token_data)
         
-        # Store refresh token
+        # Store hashed refresh token
         hashed_refresh_token = SecurityUtils.hash_refresh_token(refresh_token)
         refresh_token_record = RefreshToken(
             user_id=user.id,
@@ -356,9 +392,6 @@ class AuthService:
         )
         
         db.add(refresh_token_record)
-        
-        # Update last login
-        user.last_login = datetime.now(timezone.utc)
         db.commit()
         
         return {
@@ -367,7 +400,8 @@ class AuthService:
             "expires_at": expires_at,
             "jti": jti
         }
-    
+
+
     @staticmethod
     def validate_access_token(db: Session, token: str) -> Optional[User]:
         """
