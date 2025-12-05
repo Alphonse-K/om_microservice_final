@@ -104,7 +104,7 @@ class ProcurementService:
                     return False, "Company or country not found", None
                 
                 # Generate partner code
-                partner_code = f"{company.name[:3].upper()}-{country.iso_code}"
+                partner_code = f"{company.name[:7].upper()}-{country.iso_code}"
                 
                 balance = CompanyCountryBalance(
                     company_id=procurement.company_id,

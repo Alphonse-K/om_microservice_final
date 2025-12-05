@@ -315,15 +315,23 @@ class FeeConfigUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
-class FeeConfigResponse(FeeConfigBase):
-    id: int = Field(..., example=1)
-    
-    model_config = {
-        "from_attributes": True,
-        "json_encoders": {
-            Decimal: str
-        }
-    }
+class FeeConfigResponse(BaseModel):
+    id: int
+    source_country_id: int
+    destination_country_id: int
+    fee_type: str
+    flat_fee: Decimal | None
+    percent_fee: Decimal | None
+    min_fee: Decimal | None
+    max_fee: Decimal | None
+    status: str
+    is_active: bool
+    created_by: int
+    approved_by: int | None
+    approved_at: datetime | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProcurementBase(BaseModel):
@@ -445,11 +453,14 @@ class TokenResponse(BaseModel):
     expires_at: datetime
     user: dict
 
+
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
+
 class LogoutResponse(BaseModel):
     message: str
+
 
 class APIKeyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, example="Production Key")

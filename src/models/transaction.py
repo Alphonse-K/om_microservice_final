@@ -224,15 +224,21 @@ class FeeConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     source_country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
     destination_country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
-    
+
     # Fee calculation
     fee_type = Column(String(20), nullable=False)  # "flat", "percent", "mixed"
     flat_fee = Column(Numeric(10, 2), default=0)
     percent_fee = Column(Numeric(5, 2), default=0)
     min_fee = Column(Numeric(10, 2), default=0)
     max_fee = Column(Numeric(10, 2), nullable=True)
-    
-    is_active = Column(Boolean, default=True)
+
+    # Workflow fields
+    status = Column(String(20), default="PENDING")  
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+
+    is_active = Column(Boolean, default=False)  # becomes active ONLY after approval
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     source_country = relationship("Country", foreign_keys=[source_country_id], back_populates="fee_configs_source")

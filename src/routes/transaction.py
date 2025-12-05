@@ -470,8 +470,12 @@ def list_all_balances(
     return balances
 
 @fee_router.post("/", response_model=FeeConfigResponse)
-def create(data: FeeConfigCreate, db: Session = Depends(get_db)):
-    return create_fee_config(db, data)
+def create(
+    data: FeeConfigCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["MAKER", "USER", "ADMIN"]))
+):
+    return create_fee_config(db, data, current_user)
 
 @fee_router.get("/", response_model=list[FeeConfigResponse])
 def list_all(db: Session = Depends(get_db)):
@@ -485,11 +489,33 @@ def retrieve_one(config_id: int, db: Session = Depends(get_db)):
     return config
 
 @fee_router.put("/{config_id}", response_model=FeeConfigResponse)
-def update(config_id: int, data: FeeConfigUpdate, db: Session = Depends(get_db)):
-    updated = update_fee_config(db, config_id, data)
-    if not updated:
-        raise HTTPException(404, "Fee config not found")
-    return updated
+def update(
+    config_id: int,
+    data: FeeConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["MAKER", "ADMIN"]))
+):
+    config = get_fee_config(db, config_id)
+    if not config:
+        raise HTTPException(404, "Not found")
+
+    if config.status != "PENDING":
+        raise HTTPException(400, "Cannot update an already approved config")
+
+    return update_fee_config(db, config_id, data)
+
+@fee_router.post("/{config_id}/approve", response_model=FeeConfigResponse)
+def approve(
+    config_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["CHECKER", "ADMIN"]))
+):
+    try:
+        return approve_fee_config(db, config_id, current_user)
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @procurement_router.post("/", response_model=ProcurementResponse)
@@ -500,7 +526,7 @@ async def create_procurement_endpoint(
     db: Session = Depends(get_db)
 ):
     try:
-        # ✅ Parse JSON manually!
+        # Parse JSON manually!
         parsed_data = ProcurementCreate(**json.loads(data))
 
         # Ensure procurement is for user's company

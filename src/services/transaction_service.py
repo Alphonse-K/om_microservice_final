@@ -3,6 +3,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from sqlalchemy import or_, func
 from typing import Optional, List
+from src.models.transaction import User
 
 
 # MODELS
@@ -442,12 +443,18 @@ def get_company_by_email(db: Session, email: str):
 
 # ++++++++++++++++++ FEE SERVICE LAYER +++++++++++++++++++++++++++++++++++++++++++
 
-def create_fee_config(db: Session, data: FeeConfigCreate):
-    config = FeeConfig(**data.model_dump())
+def create_fee_config(db: Session, data: FeeConfigCreate, user: User):
+    config = FeeConfig(
+        **data.model_dump(),
+        created_by=user.id,
+        status="PENDING",
+        is_active=False
+    )
     db.add(config)
     db.commit()
     db.refresh(config)
     return config
+
 
 def list_fee_configs(db: Session):
     return db.query(FeeConfig).all()
@@ -461,6 +468,26 @@ def update_fee_config(db: Session, config_id: int, data: FeeConfigUpdate):
         return None
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(config, key, value)
+    db.commit()
+    db.refresh(config)
+    return config
+
+def approve_fee_config(db: Session, config_id: int, user: User):
+    config = get_fee_config(db, config_id)
+    if not config:
+        raise ValueError("Fee config not found")
+
+    if user.role not in ["CHECKER", "ADMIN"]:
+        raise PermissionError("Only CHECKER or ADMIN can approve")
+
+    if config.status == "APPROVED":
+        raise ValueError("Already approved")
+
+    config.status = "APPROVED"
+    config.is_active = True
+    config.approved_by = user.id
+    config.approved_at = datetime.now(timezone.utc)
+
     db.commit()
     db.refresh(config)
     return config
