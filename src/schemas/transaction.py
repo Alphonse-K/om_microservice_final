@@ -555,12 +555,12 @@ class PasswordChangeResponse(BaseModel):
 class OTPResponse(BaseModel):
     """Response model for OTP login"""
     message: str = Field(..., description="Success message")
-    expires_in: int = Field(..., description="OTP expiry time in seconds")
-    debug_info: Optional[Dict[str, Any]] = Field(
-        None, 
-        description="Debug information (development only)"
+    expires_in: Optional[int] = Field(
+        None,
+        description="OTP expiry time in seconds"
     )
-    
+    debug_info: Optional[Dict[str, Any]] = None
+
     model_config = {
         "json_schema_extra": {
             "example": {
