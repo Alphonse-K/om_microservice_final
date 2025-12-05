@@ -112,31 +112,39 @@ def refresh_tokens(
     db: Session = Depends(get_db)
 ):
     """
-    Refresh access token using refresh token
+    Refresh access token using a valid refresh token.
+    Invalidates the old refresh token and returns new tokens.
     """
+    # Extract device info from request
     device_info = {
         "user_agent": request.headers.get("user-agent"),
         "ip_address": request.client.host if request.client else None
     }
-    
+
+    # Refresh tokens via AuthService
     tokens = AuthService.refresh_tokens(db, refresh_data.refresh_token, device_info)
     if not tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
         )
-    
-    # Get user info from the new token
+
+    # Get user info from new token payload
     payload = SecurityUtils.verify_access_token(tokens["access_token"])
-    user_id = payload.get("sub")
-    user = db.query(User).filter(User.id == int(user_id)).first()
-    
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token generated"
+        )
+
+    user = db.query(User).filter(User.id == int(payload["sub"])).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
-    
+
+    # Return clean response with new tokens + user info
     return {
         "access_token": tokens["access_token"],
         "refresh_token": tokens["refresh_token"],
@@ -150,6 +158,7 @@ def refresh_tokens(
             "company_id": user.company_id
         }
     }
+
 
 @auth_router.post("/logout", response_model=LogoutResponse)
 def logout(

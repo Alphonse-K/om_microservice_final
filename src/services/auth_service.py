@@ -327,44 +327,6 @@ class AuthService:
         return True
     
     # ==================== TOKEN MANAGEMENT ====================
-    # @staticmethod
-    # def create_tokens(db: Session, user: User, device_info: Dict[str, Any] = None) -> Dict[str, Any]:
-    #     """
-    #     Create access and refresh tokens for user.
-    #     Updates last login time.
-    #     """
-    #     token_data = {
-    #         "sub": str(user.id),
-    #         "email": user.email,
-    #         "company_id": user.company_id,
-    #         "role": user.role
-    #     }
-        
-    #     # Create tokens
-    #     access_token, expires_at, jti = SecurityUtils.create_access_token(token_data)
-    #     refresh_token, refresh_expires_at = SecurityUtils.create_refresh_token(token_data)
-        
-    #     # Store refresh token
-    #     hashed_refresh_token = SecurityUtils.hash_refresh_token(refresh_token)
-    #     refresh_token_record = RefreshToken(
-    #         user_id=user.id,
-    #         token=hashed_refresh_token,
-    #         device_info=device_info,
-    #         expires_at=refresh_expires_at
-    #     )
-        
-    #     db.add(refresh_token_record)
-        
-    #     # Update last login
-    #     user.last_login = datetime.now(timezone.utc)
-    #     db.commit()
-        
-    #     return {
-    #         "access_token": access_token,
-    #         "refresh_token": refresh_token,
-    #         "expires_at": expires_at,
-    #         "jti": jti
-    #     }
     @staticmethod
     def create_tokens(db: Session, user: User, device_info: Dict[str, Any] = None) -> Dict[str, Any]:
         """
@@ -437,7 +399,7 @@ class AuthService:
         Refresh access token using refresh token.
         Invalidates old refresh token.
         """
-        # Verify refresh token
+        # 1. Verify refresh token
         payload = SecurityUtils.verify_refresh_token(refresh_token)
         if not payload:
             return None
@@ -446,7 +408,7 @@ class AuthService:
         if not user_id:
             return None
         
-        # Find refresh token in database
+        # 2. Find refresh token in DB
         hashed_token = SecurityUtils.hash_refresh_token(refresh_token)
         token_record = db.query(RefreshToken).filter(
             RefreshToken.token == hashed_token,
@@ -457,7 +419,7 @@ class AuthService:
         if not token_record:
             return None
         
-        # Get user
+        # 3. Get user
         user = db.query(User).filter(
             User.id == int(user_id),
             User.is_active == True
@@ -466,10 +428,11 @@ class AuthService:
         if not user:
             return None
         
-        # Invalidate old refresh token
+        # 4. Invalidate old refresh token
         token_record.is_active = False
-        
-        # Create new tokens
+        db.commit()  # <-- REQUIRED
+
+        # 5. Create new tokens
         return AuthService.create_tokens(db, user, device_info)
     
     @staticmethod

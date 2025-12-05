@@ -365,6 +365,7 @@ def update_user_endpoint(
     user = AuthService.update_user(db, user_id, update_data)
     return user
 
+
 @user_router.post("/change-password", response_model=PasswordChangeResponse)
 def change_password(
     password_data: PasswordChange,
@@ -414,8 +415,7 @@ def change_password(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
-        )
-    
+        )  
 
 @finance_router.get("/balance/summary", response_model=BalanceSummaryResponse)
 def get_balance_summary(
