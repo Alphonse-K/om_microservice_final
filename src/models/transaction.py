@@ -230,10 +230,10 @@ class FeeConfig(Base):
 
     # Fee calculation
     fee_type = Column(String(20), nullable=False)  # "flat", "percent", "mixed"
-    flat_fee = Column(Numeric(10, 2), default=0)
-    percent_fee = Column(Numeric(5, 2), default=0)
-    min_fee = Column(Numeric(10, 2), default=0)
-    max_fee = Column(Numeric(10, 2), nullable=True)
+    flat_fee = Column(Numeric(10, 6), default=0)
+    percent_fee = Column(Numeric(10, 6), default=0)
+    min_fee = Column(Numeric(10, 6), default=0)
+    max_fee = Column(Numeric(10, 6), nullable=True)
 
     # Workflow fields
     status = Column(String(20), default="PENDING")  
