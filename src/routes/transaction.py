@@ -473,7 +473,7 @@ def list_all_balances(
 def create(
     data: FeeConfigCreate, 
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["MAKER", "USER", "ADMIN"]))
+    current_user: User = Depends(require_role(["MAKER", "ADMIN"]))
 ):
     return create_fee_config(db, data, current_user)
 

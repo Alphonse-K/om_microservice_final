@@ -225,7 +225,7 @@ class FeeConfig(Base):
     __tablename__ = "fee_configs"
 
     id = Column(Integer, primary_key=True, index=True)
-    source_country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
+    source_country_id = Column(Integer, ForeignKey("countries.id"), nullable=True)
     destination_country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
 
     # Fee calculation

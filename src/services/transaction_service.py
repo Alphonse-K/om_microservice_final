@@ -448,7 +448,7 @@ def create_fee_config(db: Session, data: FeeConfigCreate, user: User):
         **data.model_dump(),
         created_by=user.id,
         status="PENDING",
-        is_active=False
+        # is_active=False
     )
     db.add(config)
     db.commit()
