@@ -23,7 +23,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
     ).first()
     
     if balance:
-        if transaction.transaction_type == "cashin":
+        if transaction.transaction_type == "CASHIN":
             # DEPOSIT: Company pays FROM their wallet TO Orange Money account
             # Company's balance DECREASES (they're spending from their pre-funded account)
             transaction.before_balance = balance.available_balance + balance.held_balance
@@ -31,7 +31,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
             transaction.after_balance = balance.available_balance + balance.held_balance
             print(f"📥 DEPOSIT: Company paid {transaction.amount} to Orange Money → Balance: {transaction.after_balance}")
             
-        elif transaction.transaction_type == "airtime":
+        elif transaction.transaction_type == "AIRTIME":
             # AIRTIME: Company pays FROM their wallet FOR airtime
             # Company's balance DECREASES (they're spending from their pre-funded account)
             transaction.before_balance = balance.available_balance + balance.held_balance
@@ -39,7 +39,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
             transaction.after_balance = balance.available_balance + balance.held_balance
             print(f"📱 AIRTIME: Company paid {transaction.amount} for airtime → Balance: {transaction.after_balance}")
             
-        elif transaction.transaction_type == "cashout":
+        elif transaction.transaction_type == "CASHOUT":
             # WITHDRAWAL: Orange Money pays TO company's wallet
             # Company's balance INCREASES (they're receiving money into their pre-funded account)
             transaction.before_balance = balance.available_balance + balance.held_balance

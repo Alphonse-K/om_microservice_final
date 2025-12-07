@@ -193,13 +193,13 @@ def process_transaction_queue(self):
                 }
 
                 # Create transaction object
-                if req.transaction_type == "airtime":
+                if req.transaction_type == "AIRTIME":
                     transaction = AirtimePurchase(recipient=req.msisdn, **tx_data)
                     response = om_client.purchase_credit(req.msisdn, float(amount))
-                elif req.transaction_type == "cashin":
+                elif req.transaction_type == "CASHIN":
                     transaction = DepositTransaction(recipient=req.msisdn, **tx_data)
                     response = om_client.send_deposit_with_confirmation(req.msisdn, float(amount))
-                elif req.transaction_type == "cashout":
+                elif req.transaction_type == "CASHOUT":
                     transaction = WithdrawalTransaction(sender=req.msisdn, **tx_data)
                     response = om_client.withdraw_cash(req.msisdn, float(amount))
                 else:

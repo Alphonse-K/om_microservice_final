@@ -34,9 +34,9 @@ from src.schemas.transaction import (
 
 # Minimum intervals
 BLACKOUT_TIMES = {
-    "cashin": timedelta(minutes=10),
-    "cashout": timedelta(minutes=10),
-    "airtime": timedelta(minutes=4),
+    "CASHIN": timedelta(minutes=10),
+    "CASHOUT": timedelta(minutes=10),
+    "AIRTIME": timedelta(minutes=4),
 }
 
 def ussd_is_failure(text: str | None) -> bool:
@@ -71,7 +71,7 @@ def check_blackout(db: Session, model, msisdn: str, tx_type: str) -> bool:
     last_tx = (
         db.query(model)
         .filter(model.status.in_(["created", "initiated", "pending", "processing"]))
-        .filter((model.recipient == msisdn) if tx_type != "cashout" else (model.sender == msisdn))
+        .filter((model.recipient == msisdn) if tx_type != "CASHOUT" else (model.sender == msisdn))
         .order_by(model.created_at.desc())
         .first()
     )
@@ -97,15 +97,17 @@ async def create_deposit(db: Session, deposit: DepositCreate):
         raise Exception("Deposit blackout: please wait 10 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="cashin",
+        transaction_type="CASHIN",  # match enum in DB
         msisdn=deposit.recipient,
         amount=deposit.amount,
         partner_id=deposit.partner_id,
+        company_id=deposit.company_id,  # must include!
         country_iso=deposit.destination_country_iso,
         status="pending",
     )
     db.add(pending)
     db.commit()
+    db.refresh(pending)
 
     return {"message": "Deposit queued for execution.", "queue_id": pending.id}
 
@@ -113,20 +115,22 @@ async def create_deposit(db: Session, deposit: DepositCreate):
 # ====================================================
 # WITHDRAWAL (QUEUE MODE)
 # ====================================================
-async def intitiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCreate):
-    if check_blackout(db, WithdrawalTransaction, withdrawal.sender, "cashout"):
+async def initiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCreate):
+    if check_blackout(db, WithdrawalTransaction, withdrawal.sender, "CASHOUT"):
         raise Exception("Withdrawal blackout: please wait 10 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="cashout",
+        transaction_type="CASHOUT",
         msisdn=withdrawal.sender,
         amount=withdrawal.amount,
         partner_id=withdrawal.partner_id,
+        company_id=withdrawal.company_id,  # must include!
         country_iso=withdrawal.destination_country_iso,
         status="pending",
     )
     db.add(pending)
     db.commit()
+    db.refresh(pending)
 
     return {"message": "Withdrawal queued for execution.", "queue_id": pending.id}
 
@@ -135,19 +139,21 @@ async def intitiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCr
 # AIRTIME (QUEUE MODE)
 # ====================================================
 async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
-    if check_blackout(db, AirtimePurchase, airtime.recipient, "airtime"):
+    if check_blackout(db, AirtimePurchase, airtime.recipient, "AIRTIME"):
         raise Exception("Airtime blackout: wait 4 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="airtime",
+        transaction_type="AIRTIME",
         msisdn=airtime.recipient,
         amount=airtime.amount,
         partner_id=airtime.partner_id,
+        company_id=airtime.company_id,  # must include!
         country_iso=airtime.destination_country_iso,
-        status="pending",
+        status="pending",  # missing comma in your version
     )
     db.add(pending)
     db.commit()
+    db.refresh(pending)
 
     return {"message": "Airtime queued for execution.", "queue_id": pending.id}
 

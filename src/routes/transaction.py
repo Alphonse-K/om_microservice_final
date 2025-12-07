@@ -279,7 +279,7 @@ async def purchase_airtime(airtime: AirtimeCreate, db: Session = Depends(get_db)
 @transaction_router.post("/initiate/withdrawal/", response_model=WithdrawalResponse)
 async def initiate_withdrawal(withdrawal: WithdrawalCreate, db: Session = Depends(get_db)):
     try:
-        result = await intitiate_withdrawal_transaction(db, withdrawal)
+        result = await initiate_withdrawal_transaction(db, withdrawal)
         return result
     except Exception as e:
         raise HTTPException(status_code=429, detail=str(e))

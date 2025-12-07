@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
-from typing import Literal, List, Any, Dict
+from typing import List, Any, Dict
 
 from src.models.transaction import TransactionType 
 
@@ -43,8 +43,6 @@ class AirtimeBase(BaseModel):
     ..., min_length=2, max_length=3,
     description="ISO code of the destination country (e.g. CI, ML, SN)"
     )
-
-    
 
 
 # -------------------------- CREATE SCHEMAS ---------------------------------
