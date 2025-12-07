@@ -61,9 +61,9 @@ def sync_account(self, label: str, token_path: str):
             body_lower = body_text.lower()
 
             if "retrait de" in body_lower:
-                detected_type = "withdrawal"
+                detected_type = "cashout"
             elif "depot vers" in body_lower:
-                detected_type = "deposit"
+                detected_type = "cashin"
             elif "rechargement" in body_lower:
                 detected_type = "airtime"
             else:

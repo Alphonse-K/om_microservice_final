@@ -4,31 +4,47 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
 from typing import Literal, List, Any, Dict
 
-from src.core.constants import TransactionStatus, WithdrawalStatus
-from src.models.transaction import RoleEnum
+from src.models.transaction import TransactionType 
 
 # -------------------------- BASE SCHEMAS -----------------------------------
-
 # ------------------- Deposit -------------------
 class DepositBase(BaseModel):
     recipient: str = Field(..., min_length=9, max_length=15)
     amount: Decimal = Field(..., ge=2000, le=15_000_000)
-    transaction_type: Literal["deposit"] = Field(..., description="Must be 'deposit'")
+    transaction_type: TransactionType = Field(..., description="Type of transaction (e.g., CASHIN, CASHOUT)")
     partner_id: str = Field(..., max_length=100)
+    destination_country_iso: str = Field(
+    ..., min_length=2, max_length=3,
+    description="ISO code of the destination country (e.g. CI, ML, SN)"
+    )
+
+    
 
 # ------------------- Withdrawal -------------------
 class WithdrawalBase(BaseModel):
     sender: str = Field(..., min_length=9, max_length=15)
     amount: Decimal = Field(..., ge=2000, le=15_000_000)
-    transaction_type: Literal["withdrawal"] = Field(..., description="Must be 'withdrawal'")
+    transaction_type: TransactionType = Field(..., description="Type of transaction (e.g., CASHIN, CASHOUT)")
     partner_id: str = Field(..., max_length=100)
+    destination_country_iso: str = Field(
+    ..., min_length=2, max_length=3,
+    description="ISO code of the destination country (e.g. CI, ML, SN)"
+    )
+
+    
 
 # ------------------- Airtime -------------------
 class AirtimeBase(BaseModel):
     recipient: str = Field(..., min_length=9, max_length=15)
     amount: Decimal = Field(..., ge=1000, le=250_000)
-    transaction_type: Literal["credit_purchase"] = Field(..., description="Must be 'credit_purchase'")
+    transaction_type: TransactionType = Field(..., description="Type of transaction (e.g., CASHIN, CASHOUT)")
     partner_id: str = Field(..., max_length=100)
+    destination_country_iso: str = Field(
+    ..., min_length=2, max_length=3,
+    description="ISO code of the destination country (e.g. CI, ML, SN)"
+    )
+
+    
 
 
 # -------------------------- CREATE SCHEMAS ---------------------------------
@@ -279,33 +295,64 @@ class UserResponse(BaseModel):
 
 
 class FeeConfigBase(BaseModel):
-    source_country_id: int = Field(..., example=1)
-    destination_country_id: int = Field(..., example=2)
-    fee_type: str = Field(..., example="percent")
-    flat_fee: Decimal = Field(default=0, example="5.00")
-    percent_fee: Decimal = Field(default=0, example="1.50")
-    min_fee: Decimal = Field(default=0, example="0.50")
-    max_fee: Optional[Decimal] = Field(default=None, example="10.00")
-    is_active: bool = Field(default=True, example=True)
-    
-    @field_validator('percent_fee')
-    @classmethod
+    transaction_type: TransactionType = Field(
+        ..., description="Type of transaction (e.g., CASH_IN, CASH_OUT)"
+    )
+
+    destination_country_id: int = Field(
+        ..., example=2, description="ID of the destination/receiving country"
+    )
+
+    fee_type: str = Field(
+        ..., example="percent", description="Either 'flat' or 'percent'"
+    )
+
+    flat_fee: Decimal = Field(
+        ..., example="5.00", description="Flat fee applied when fee_type='flat'"
+    )
+    percent_fee: Decimal = Field(
+        ..., example="1.50", description="Percent fee when fee_type='percent'"
+    )
+
+    min_fee: Decimal = Field(
+        ..., example="0.50", description="Minimum fee allowed"
+    )
+    max_fee: Optional[Decimal] = Field(
+        ..., example="10.00", description="Maximum fee allowed"
+    )
+
+    is_active: bool = Field(
+        ..., example=True, description="Whether this fee configuration is active"
+    )
+
+    # ---------------- VALIDATORS ---------------- #
+
+    @field_validator("percent_fee")
     def validate_percent_fee(cls, v: Decimal) -> Decimal:
         if v < 0 or v > 100:
-            raise ValueError('Percent fee must be between 0 and 100')
+            raise ValueError("Percent fee must be between 0 and 100")
+        return v
+
+    @field_validator("max_fee", mode="before")
+    def validate_max_fee(cls, v: Any) -> Optional[Decimal]:
+        """
+        Fix corrupted max_fee values (some DB rows may contain invalid strings)
+        """
+        if v is not None and isinstance(v, str) and len(v) > 50:
+            return None
         return v
     
-    @field_validator('max_fee', mode='before')
-    @classmethod
-    def validate_max_fee(cls, v: Any) -> Optional[Decimal]:
-        if v is not None and isinstance(v, str) and len(v) > 50:
-            # Fix corrupted max_fee values
-            return None
+    @field_validator("fee_type")
+    def validate_fee_type(cls, v: str) -> str:
+        allowed = {"flat", "percent", "mixed"}
+        if v not in allowed:
+            raise ValueError(f"fee_type must be one of {allowed}")
         return v
 
 
 class FeeConfigCreate(FeeConfigBase):
     pass
+
 
 class FeeConfigUpdate(BaseModel):
     flat_fee: Optional[Decimal] = None
@@ -317,13 +364,13 @@ class FeeConfigUpdate(BaseModel):
 
 class FeeConfigResponse(BaseModel):
     id: int
-    source_country_id: int
+    transaction_type: TransactionType
     destination_country_id: int
     fee_type: str
-    flat_fee: Decimal | None
-    percent_fee: Decimal | None
-    min_fee: Decimal | None
-    max_fee: Decimal | None
+    flat_fee: Decimal
+    percent_fee: Decimal
+    min_fee: Decimal
+    max_fee: Optional[Decimal]
     status: str
     is_active: bool
     created_by: int

@@ -9,8 +9,8 @@ def find_matching_transaction(db: Session, parsed: dict):
     amount = parsed.get("amount")
 
     model_map = {
-        "deposit": DepositTransaction,
-        "withdrawal": WithdrawalTransaction,
+        "cashin": DepositTransaction,
+        "cashout": WithdrawalTransaction,
         "airtime": AirtimePurchase,
     }
 
@@ -29,7 +29,7 @@ def find_matching_transaction(db: Session, parsed: dict):
     # Oldest transaction first → safest
     # --------------------------
 
-    if tx_type == "withdrawal":
+    if tx_type == "cashout":
         candidate = (
             db.query(Model)
             .filter(Model.status.in_(statuses))
@@ -57,7 +57,7 @@ def find_matching_transaction(db: Session, parsed: dict):
 
     window_start = datetime.now(timezone.utc) - timedelta(hours=2)
 
-    if tx_type == "withdrawal":
+    if tx_type == "cashout":
         candidate = (
             db.query(Model)
             .filter(Model.status.in_(statuses))

@@ -31,8 +31,8 @@ class PendingStatus(str, Enum):
 
 
 class TransactionType(str, Enum):
-    DEPOSIT = "deposit"
-    WITHDRAWAL = "withdrawal"
+    CASHIN = "cashin"
+    CASHOUT = "cashout"
     AIRTIME = "airtime"
 
 
@@ -225,27 +225,48 @@ class FeeConfig(Base):
     __tablename__ = "fee_configs"
 
     id = Column(Integer, primary_key=True, index=True)
-    source_country_id = Column(Integer, ForeignKey("countries.id"), nullable=True)
-    destination_country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
+
+    transaction_type = Column(
+        SAEnum(TransactionType, name="transaction_type_enum"),
+        nullable=False
+    )
+
+    destination_country_id = Column(
+        Integer,
+        ForeignKey("countries.id"),
+        nullable=False
+    )
 
     # Fee calculation
-    fee_type = Column(String(20), nullable=False)  # "flat", "percent", "mixed"
+    fee_type = Column(String(20), nullable=False)  # flat, percent, mixed
     flat_fee = Column(Numeric(10, 6), default=0)
     percent_fee = Column(Numeric(10, 6), default=0)
     min_fee = Column(Numeric(10, 6), default=0)
     max_fee = Column(Numeric(10, 6), nullable=True)
 
     # Workflow fields
-    status = Column(String(20), default="PENDING")  
+    status = Column(String(20), default="PENDING")
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
 
-    is_active = Column(Boolean, default=False)  # becomes active ONLY after approval
+    is_active = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    source_country = relationship("Country", foreign_keys=[source_country_id], back_populates="fee_configs_source")
-    destination_country = relationship("Country", foreign_keys=[destination_country_id], back_populates="fee_configs_destination")
+    destination_country = relationship(
+        "Country",
+        foreign_keys=[destination_country_id],
+        back_populates="fee_configs_destination"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "transaction_type",
+            "destination_country_id",
+            "is_active",
+            name="uix_fee_active_rule"
+        ),
+    )
 
 
 class Procurement(Base):
@@ -440,7 +461,10 @@ class PendingTransaction(Base):
     __tablename__ = "pending_transactions"
     
     id = Column(Integer, primary_key=True, index=True)
-    transaction_type = Column(String(20), nullable=False)
+    transaction_type = Column(
+        SAEnum(TransactionType, name="transaction_type_enum"),
+        nullable=False
+    )
     msisdn = Column(String(20), nullable=False)
     amount = Column(Numeric(14, 2), nullable=False)
     partner_id = Column(String(100), nullable=False)

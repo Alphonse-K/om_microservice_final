@@ -16,7 +16,6 @@ from src.models.transaction import (
     CompanyCountryBalance,
     Company,
     FeeConfig,
-    Procurement,
 )
 
 # SCHEMAS
@@ -26,21 +25,17 @@ from src.schemas.transaction import (
     AirtimeCreate,
     CountryCreate,
     CountryUpdate,
-    CompanyBalanceCreate,
-    CompanyBalanceUpdate,
     CompanyCreate,
     CompanyUpdate,
     FeeConfigCreate,
     FeeConfigUpdate,
-    ProcurementCreate,
-    ProcurementUpdate,
 )
 
 
 # Minimum intervals
 BLACKOUT_TIMES = {
-    "deposit": timedelta(minutes=10),
-    "withdrawal": timedelta(minutes=10),
+    "cashin": timedelta(minutes=10),
+    "cashout": timedelta(minutes=10),
     "airtime": timedelta(minutes=4),
 }
 
@@ -76,7 +71,7 @@ def check_blackout(db: Session, model, msisdn: str, tx_type: str) -> bool:
     last_tx = (
         db.query(model)
         .filter(model.status.in_(["created", "initiated", "pending", "processing"]))
-        .filter((model.recipient == msisdn) if tx_type != "withdrawal" else (model.sender == msisdn))
+        .filter((model.recipient == msisdn) if tx_type != "cashout" else (model.sender == msisdn))
         .order_by(model.created_at.desc())
         .first()
     )
@@ -98,14 +93,15 @@ def check_blackout(db: Session, model, msisdn: str, tx_type: str) -> bool:
 # DEPOSIT (QUEUE MODE)
 # ====================================================
 async def create_deposit(db: Session, deposit: DepositCreate):
-    if check_blackout(db, DepositTransaction, deposit.recipient, "deposit"):
+    if check_blackout(db, DepositTransaction, deposit.recipient, "cashin"):
         raise Exception("Deposit blackout: please wait 10 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="deposit",
+        transaction_type="cashin",
         msisdn=deposit.recipient,
         amount=deposit.amount,
         partner_id=deposit.partner_id,
+        country_iso=deposit.destination_country_iso,
         status="pending",
     )
     db.add(pending)
@@ -118,14 +114,15 @@ async def create_deposit(db: Session, deposit: DepositCreate):
 # WITHDRAWAL (QUEUE MODE)
 # ====================================================
 async def intitiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCreate):
-    if check_blackout(db, WithdrawalTransaction, withdrawal.sender, "withdrawal"):
+    if check_blackout(db, WithdrawalTransaction, withdrawal.sender, "cashout"):
         raise Exception("Withdrawal blackout: please wait 10 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="withdrawal",
+        transaction_type="cashout",
         msisdn=withdrawal.sender,
         amount=withdrawal.amount,
         partner_id=withdrawal.partner_id,
+        country_iso=withdrawal.destination_country_iso,
         status="pending",
     )
     db.add(pending)
@@ -146,6 +143,7 @@ async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
         msisdn=airtime.recipient,
         amount=airtime.amount,
         partner_id=airtime.partner_id,
+        country_iso=airtime.destination_country_iso,
         status="pending",
     )
     db.add(pending)
@@ -385,7 +383,7 @@ def get_company_stats(db: Session, company_id: int):
     for tx in recent_deposits:
         recent_transactions.append({
             "id": tx.id,
-            "type": "deposit",
+            "type": "cashin",
             "amount": float(tx.amount),
             "msisdn": tx.recipient,
             "status": tx.status,
@@ -395,7 +393,7 @@ def get_company_stats(db: Session, company_id: int):
     for tx in recent_withdrawals:
         recent_transactions.append({
             "id": tx.id,
-            "type": "withdrawal",
+            "type": "cashout",
             "amount": float(tx.amount),
             "msisdn": tx.sender,
             "status": tx.status,
@@ -414,9 +412,9 @@ def get_company_stats(db: Session, company_id: int):
         "total_balance": float(balance_stats.total_available or 0) + float(balance_stats.total_held or 0),
         "total_transactions": deposit_count + withdrawal_count + airtime_count,
         "transaction_breakdown": {
-            "deposits": deposit_count,
-            "withdrawals": withdrawal_count,
-            "airtime_purchases": airtime_count
+            "cashin": deposit_count,
+            "cashout": withdrawal_count,
+            "airtime": airtime_count
         },
         "recent_transactions": recent_transactions,
         # Additional stats

@@ -26,7 +26,7 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.gmail_sync.sync_account",
         "schedule": timedelta(seconds=int(settings.GMAIL_FETCH_INTERVAL)),
         "args": (
-            "withdrawal",
+            "cashout",
             settings.GMAIL_WITHDRAWAL_TOKEN,  # SAME TOKEN for deposit/withdrawal
         ),
     },
@@ -38,7 +38,7 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.gmail_sync.sync_account",
         "schedule": timedelta(seconds=int(settings.GMAIL_FETCH_INTERVAL)),
         "args": (
-            "deposit",
+            "cashin",
             settings.GMAIL_WITHDRAWAL_TOKEN,  # SAME TOKEN
         ),
     },
