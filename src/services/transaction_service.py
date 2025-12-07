@@ -109,7 +109,7 @@ async def create_deposit(db: Session, deposit: DepositCreate):
     db.commit()
     db.refresh(pending)
 
-    return {"message": "Deposit queued for execution.", "queue_id": pending.id}
+    return pending
 
 
 # ====================================================
@@ -132,7 +132,7 @@ async def initiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCre
     db.commit()
     db.refresh(pending)
 
-    return {"message": "Withdrawal queued for execution.", "queue_id": pending.id}
+    return pending
 
 
 # ====================================================
@@ -155,7 +155,7 @@ async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
     db.commit()
     db.refresh(pending)
 
-    return {"message": "Airtime queued for execution.", "queue_id": pending.id}
+    return pending
 
 # ++++++++++++++++++ GET REQUEST FOR DEPOSIT, AIRTIME, WITHDRAWAL +++++++++++++++++++++++++++++++++++++++++++
 
