@@ -17,6 +17,7 @@ class DepositBase(BaseModel):
     ..., min_length=2, max_length=3,
     description="ISO code of the destination country (e.g. CI, ML, SN)"
     )
+    company_id: int
 
     
 
@@ -30,6 +31,7 @@ class WithdrawalBase(BaseModel):
     ..., min_length=2, max_length=3,
     description="ISO code of the destination country (e.g. CI, ML, SN)"
     )
+    company_id: int
 
     
 
@@ -43,6 +45,7 @@ class AirtimeBase(BaseModel):
     ..., min_length=2, max_length=3,
     description="ISO code of the destination country (e.g. CI, ML, SN)"
     )
+    company_id: int
 
 
 # -------------------------- CREATE SCHEMAS ---------------------------------
