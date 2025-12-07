@@ -97,12 +97,12 @@ async def create_deposit(db: Session, deposit: DepositCreate):
         raise Exception("Deposit blackout: please wait 10 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="CASHIN",  # match enum in DB
+        transaction_type="cashin",
         msisdn=deposit.recipient,
         amount=deposit.amount,
         partner_id=deposit.partner_id,
-        company_id=deposit.company_id,  # must include!
         country_iso=deposit.destination_country_iso,
+        company_id=deposit.company_id,  # <-- THIS IS REQUIRED
         status="pending",
     )
     db.add(pending)
@@ -120,12 +120,12 @@ async def initiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCre
         raise Exception("Withdrawal blackout: please wait 10 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="CASHOUT",
+        transaction_type="cashout",
         msisdn=withdrawal.sender,
         amount=withdrawal.amount,
         partner_id=withdrawal.partner_id,
-        company_id=withdrawal.company_id,  # must include!
         country_iso=withdrawal.destination_country_iso,
+        company_id=withdrawal.company_id,
         status="pending",
     )
     db.add(pending)
@@ -143,13 +143,13 @@ async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
         raise Exception("Airtime blackout: wait 4 minutes.")
 
     pending = PendingTransaction(
-        transaction_type="AIRTIME",
+        transaction_type="airtime",
         msisdn=airtime.recipient,
         amount=airtime.amount,
         partner_id=airtime.partner_id,
-        company_id=airtime.company_id,  # must include!
         country_iso=airtime.destination_country_iso,
-        status="pending",  # missing comma in your version
+        company_id=airtime.company_id,
+        status="pending",
     )
     db.add(pending)
     db.commit()
