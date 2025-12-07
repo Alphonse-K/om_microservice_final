@@ -56,7 +56,6 @@ class Country(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     procurements = relationship("Procurement", back_populates="country")
-    fee_configs_source = relationship("FeeConfig", foreign_keys="[FeeConfig.source_country_id]", back_populates="source_country")
     fee_configs_destination = relationship("FeeConfig", foreign_keys="[FeeConfig.destination_country_id]", back_populates="destination_country")
     balances = relationship("CompanyCountryBalance", back_populates="country")
     
