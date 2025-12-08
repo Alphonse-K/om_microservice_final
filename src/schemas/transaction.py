@@ -166,7 +166,7 @@ class QueuedTransactionResponse(BaseModel):
     id: int
     transaction_type: str
     amount: Decimal
-    recipient: str
+    msisdn: str
     status: str
     company_id: int
     partner_id: str
