@@ -258,7 +258,7 @@ def get_company_by_email_endpoint(
     return company
 
 # ---------------------- DEPOSIT ----------------------
-@transaction_router.post("/send/orange-money/", response_model=DepositResponse)
+@transaction_router.post("/send/orange-money/", response_model=QueuedTransactionResponse)
 async def send_deposit(deposit: DepositCreate, db: Session = Depends(get_db)):
     try:
         result = await create_deposit(db, deposit)
@@ -267,7 +267,7 @@ async def send_deposit(deposit: DepositCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=429, detail=str(e))
 
 # ---------------------- AIRTIME ----------------------
-@transaction_router.post("/purchase/airtime/", response_model=AirtimeResponse)
+@transaction_router.post("/purchase/airtime/", response_model=QueuedTransactionResponse)
 async def purchase_airtime(airtime: AirtimeCreate, db: Session = Depends(get_db)):
     try:
         result = await create_airtime_purchase(db, airtime)
@@ -276,7 +276,7 @@ async def purchase_airtime(airtime: AirtimeCreate, db: Session = Depends(get_db)
         raise HTTPException(status_code=429, detail=str(e))
 
 # ---------------------- WITHDRAWAL ----------------------
-@transaction_router.post("/initiate/withdrawal/", response_model=WithdrawalResponse)
+@transaction_router.post("/initiate/withdrawal/", response_model=QueuedTransactionResponse)
 async def initiate_withdrawal(withdrawal: WithdrawalCreate, db: Session = Depends(get_db)):
     try:
         result = await initiate_withdrawal_transaction(db, withdrawal)
