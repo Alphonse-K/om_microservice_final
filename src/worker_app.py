@@ -15,6 +15,7 @@ celery_app.autodiscover_tasks(["src.tasks"])
 import src.tasks.gmail_sync
 import src.tasks.email_confirmation
 import src.tasks.transaction_checker
+import src.tasks.transaction_queue
 
 
 celery_app.conf.beat_schedule = {
@@ -62,5 +63,14 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.transaction_checker.mark_stale_transactions_task",
         "schedule": timedelta(minutes=60),
     },
+
+    # --------------------------------------------------------
+    # 5. Transaction Queue Manager
+    # --------------------------------------------------------
+    "check-stale-transactions": {
+        "task": "src.tasks.transaction_queue.process_transaction_queue",
+        "schedule": timedelta(seconds=15),
+    },
+
 }
 
