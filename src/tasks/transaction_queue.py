@@ -145,6 +145,11 @@ def process_transaction_queue(self):
                 db.add(req)
                 db.commit()
 
+                # ---------------------------------------------------
+                # Normalize transaction type
+                # ---------------------------------------------------
+                req_type = (req.transaction_type or "").strip().lower()
+
                 company_id = req.company_id
 
                 # Determine destination country
@@ -165,11 +170,11 @@ def process_transaction_queue(self):
 
                 amount = Decimal(str(req.amount))
 
-                # Calculate fees (destination-only)
+                # Calculate fees using normalized type
                 fee_info = fee_calculator.calculate_fee(
                     db,
                     destination_country_id=destination_country.id,
-                    transaction_type=req.transaction_type,
+                    transaction_type=req_type,
                     amount=amount
                 )
 
@@ -187,23 +192,28 @@ def process_transaction_queue(self):
                     "service_partner_id": None,
                     "status": "initiated",
                     "fee_amount": fee_info["fee_amount"],
-                    "net_amount": amount,  # full amount sent
+                    "net_amount": amount,
                     "before_balance": balance.available_balance + balance.held_balance + held_amount,
                     "after_balance": balance.available_balance + balance.held_balance,
                 }
 
-                # Create transaction object
-                if req.transaction_type == "AIRTIME":
+                # ---------------------------------------------------
+                # Transaction Routing (fixed)
+                # ---------------------------------------------------
+                if req_type == "airtime":
                     transaction = AirtimePurchase(recipient=req.msisdn, **tx_data)
                     response = om_client.purchase_credit(req.msisdn, float(amount))
-                elif req.transaction_type == "CASHIN":
+
+                elif req_type == "cashin":
                     transaction = DepositTransaction(recipient=req.msisdn, **tx_data)
                     response = om_client.send_deposit_with_confirmation(req.msisdn, float(amount))
-                elif req.transaction_type == "CASHOUT":
+
+                elif req_type == "cashout":
                     transaction = WithdrawalTransaction(sender=req.msisdn, **tx_data)
                     response = om_client.withdraw_cash(req.msisdn, float(amount))
+
                 else:
-                    raise Exception(f"Unknown transaction type {req.transaction_type}")
+                    raise Exception(f"Unknown transaction type '{req.transaction_type}'")
 
                 # Save transaction response
                 if response:
