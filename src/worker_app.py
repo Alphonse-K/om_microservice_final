@@ -67,7 +67,7 @@ celery_app.conf.beat_schedule = {
     # --------------------------------------------------------
     # 5. Transaction Queue Manager
     # --------------------------------------------------------
-    "check-stale-transactions": {
+    "sync-queued-transactions": {
         "task": "src.tasks.transaction_queue.process_transaction_queue",
         "schedule": timedelta(seconds=15),
     },
