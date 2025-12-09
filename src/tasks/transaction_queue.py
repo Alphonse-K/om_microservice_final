@@ -122,6 +122,7 @@ class CountryRouter:
 
 
 # ----------------- PROCESS TRANSACTION QUEUE ----------------- #
+# ----------------- PROCESS TRANSACTION QUEUE ----------------- #
 @celery_app.task(bind=True, max_retries=3, name='src.tasks.transaction_queue.process_transaction_queue')
 def process_transaction_queue(self):
     db: Session = SessionLocal()
@@ -149,7 +150,6 @@ def process_transaction_queue(self):
                 # Normalize transaction type
                 # ---------------------------------------------------
                 req_type = (req.transaction_type or "").strip().lower()
-
                 company_id = req.company_id
 
                 # Determine destination country
@@ -168,49 +168,52 @@ def process_transaction_queue(self):
                 if not balance:
                     raise Exception(f"No balance for company {company_id} in {destination_country.iso_code}")
 
-                amount = Decimal(str(req.amount))
+                amount_decimal = Decimal(str(req.amount))
+                held_amount = amount_decimal
 
-                # Calculate fees using normalized type
+                # Calculate fees
                 fee_info = fee_calculator.calculate_fee(
                     db,
                     destination_country_id=destination_country.id,
                     transaction_type=req_type,
-                    amount=amount
+                    amount=amount_decimal
                 )
 
-                # Hold full amount
-                held_amount = amount
+                # Hold full amount in balance
                 balance_manager.hold_balance(db, company_id, destination_country.id, held_amount)
 
                 tx_data = {
                     "company_id": company_id,
                     "pending_transaction_id": req.id,
-                    "amount": amount,
+                    "amount": amount_decimal,
                     "country_id": destination_country.id,
                     "balance_id": balance.id,
                     "partner_id": req.partner_id,
                     "service_partner_id": None,
                     "status": "initiated",
                     "fee_amount": fee_info["fee_amount"],
-                    "net_amount": amount,
+                    "net_amount": amount_decimal,
                     "before_balance": balance.available_balance + balance.held_balance + held_amount,
                     "after_balance": balance.available_balance + balance.held_balance,
                 }
 
                 # ---------------------------------------------------
-                # Transaction Routing (fixed)
+                # Convert amount to int for gateway
                 # ---------------------------------------------------
+                gateway_amount = int(amount_decimal)
+
+                # Transaction Routing
                 if req_type == "airtime":
                     transaction = AirtimePurchase(recipient=req.msisdn, **tx_data)
-                    response = om_client.purchase_credit(req.msisdn, float(amount))
+                    response = om_client.purchase_credit(req.msisdn, gateway_amount)
 
                 elif req_type == "cashin":
                     transaction = DepositTransaction(recipient=req.msisdn, **tx_data)
-                    response = om_client.send_deposit_with_confirmation(req.msisdn, float(amount))
+                    response = om_client.send_deposit_with_confirmation(req.msisdn, gateway_amount)
 
                 elif req_type == "cashout":
                     transaction = WithdrawalTransaction(sender=req.msisdn, **tx_data)
-                    response = om_client.withdraw_cash(req.msisdn, float(amount))
+                    response = om_client.withdraw_cash(req.msisdn, gateway_amount)
 
                 else:
                     raise Exception(f"Unknown transaction type '{req.transaction_type}'")
@@ -233,7 +236,7 @@ def process_transaction_queue(self):
                 db.add(req)
                 db.commit()
 
-                logger.info(f"Processed transaction {transaction.id} (pending_id={req.id}) - amount={amount} fee={fee_info['fee_amount']}")
+                logger.info(f"Processed transaction {transaction.id} (pending_id={req.id}) - amount={amount_decimal} fee={fee_info['fee_amount']}")
 
             except Exception as e:
                 logger.error(f"Failed transaction id={req.id if req else 'N/A'}: {str(e)}", exc_info=True)
