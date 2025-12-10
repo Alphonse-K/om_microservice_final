@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # Message broker
     # -----------------------------
     REDIS_URL: str
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
+    REDIS_PASSWORD: str
 
     SECRET_KEY: str
 
