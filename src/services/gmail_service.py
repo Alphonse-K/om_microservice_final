@@ -63,42 +63,6 @@ def clean_email_body(html: str) -> str:
     return cleaned.strip()
 
 
-# def fetch_recent_emails(token_path: str, max_results: int = 100, query: str = None):
-#     svc = build_service_for_token(token_path)
-
-#     params = {
-#         "userId": "me",
-#         "maxResults": max_results,
-#         "includeSpamTrash": True,
-#     }
-
-#     if query:
-#         params["q"] = query
-
-#     resp = svc.users().messages().list(**params).execute()
-#     msgs = resp.get('messages', [])
-    
-#     result = []
-#     for m in msgs:
-#         msg = svc.users().messages().get(userId='me', id=m['id'], format='full').execute()
-#         payload = msg.get('payload', {})
-#         headers = payload.get('headers', [])
-
-#         subject = next((h['value'] for h in headers if h.get('name', '').lower() == 'subject'), '')
-#         sender = next((h['value'] for h in headers if h.get('name', '').lower() == 'from'), '')
-#         body = _extract_body(payload) or msg.get('snippet', '')
-
-#         result.append({
-#             'id': msg.get('id'),
-#             'threadId': msg.get('threadId'),
-#             'subject': subject,
-#             'sender': sender,
-#             'body': body,
-#             'snippet': msg.get('snippet'),
-#             'internalDate': msg.get('internalDate'),
-#         })
-
-#     return result
 
 def fetch_recent_emails(token_path: str, max_results: int = 100, query: str = None):
     svc = build_service_for_token(token_path)
