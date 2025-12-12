@@ -54,6 +54,7 @@ def fetch_and_store_emails(label: str, token_path: str):
                 "subject": msg.get("subject"),
                 "sender": msg.get("sender"),
                 "body": body_text,
+                "received_at": datetime.fromtimestamp(msg.get("internalDate", 0), tz=timezone.utc),
                 "parsed_transaction_id": parsed.get("transaction_id"),
             }
 
