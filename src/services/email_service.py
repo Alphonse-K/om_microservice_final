@@ -10,14 +10,32 @@ import os
 
 logger = logging.getLogger(__name__)
 
-def create_email(db: Session, paylaod: dict) -> EmailMessageCreate:
-    # payload is a dict with fields matching EmailMessage
-    email = EmailMessage(**paylaod)
-    db.add(email)
-    db.commit()
-    db.refresh(email)
-    return email
+# def create_email(db: Session, paylaod: dict) -> EmailMessageCreate:
+#     # payload is a dict with fields matching EmailMessage
+#     email = EmailMessage(**paylaod)
+#     db.add(email)
+#     db.commit()
+#     db.refresh(email)
+#     return email
 
+def create_email(db: Session, payload: dict) -> EmailMessage:
+    """
+    Creates a new EmailMessage record in the database.
+    Expects 'received_at' to be a timezone-aware datetime.
+    """
+    email_obj = EmailMessage(
+        gmail_account=payload.get("gmail_account"),
+        message_id=payload.get("message_id"),
+        subject=payload.get("subject"),
+        sender=payload.get("sender"),
+        body=payload.get("body"),
+        parsed_transaction_id=payload.get("parsed_transaction_id"),
+        received_at=payload.get("received_at"),  # <- ensure this is a datetime object
+    )
+    db.add(email_obj)
+    db.commit()
+    db.refresh(email_obj)
+    return email_obj
 
 def get_email_by_message_id(db: Session, message_id: str):
     return db.query(EmailMessage).filter(EmailMessage.message_id==message_id).first()
