@@ -9,7 +9,7 @@ from src.utils.parser import parse_transaction_email
 # --- CONFIG: list of Gmail accounts and their tokens ---
 GMAIL_ACCOUNTS = [
     {"label": "airtime", "token_path": "/app/credentials/airtime_token.json"},
-    {"label": "cashout", "token_path": "/app/credentials/cashout_token.json"},
+    {"label": "cashout", "token_path": "/app/credentials/withdrawal_token.json"},
 ]
 
 NUM_EMAILS = 2  # fetch the 2 most recent emails per account
@@ -54,7 +54,6 @@ def fetch_and_store_emails(label: str, token_path: str):
                 "subject": msg.get("subject"),
                 "sender": msg.get("sender"),
                 "body": body_text,
-                "received_at": datetime.fromtimestamp(msg.get("internalDate", 0), tz=timezone.utc),
                 "parsed_transaction_id": parsed.get("transaction_id"),
             }
 
