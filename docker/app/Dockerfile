@@ -6,18 +6,20 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system deps
+# System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq5 \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user (must be done BEFORE chown)
+# Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
-# Create uploads folder and give permissions to appuser
-RUN mkdir -p /app/uploads && \
-    chown -R appuser:appuser /app/uploads
+# Create uploads directory with secure permissions
+RUN mkdir -p /app/uploads/slips \
+    && chown -R appuser:appuser /app/uploads \
+    && chmod -R 750 /app/uploads
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -27,9 +29,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY --chown=appuser:appuser src/ /app/src/
 
-RUN mkdir -p /app/uploads/slips \
-    && chmod -R 755 /app/uploads
-    
 # Switch to non-root user
 USER appuser
 
