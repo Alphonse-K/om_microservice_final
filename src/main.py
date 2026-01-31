@@ -18,8 +18,7 @@ from src.routes.emails import email_router
 
 app = FastAPI(title="CashMoov API", version="1.0.0")
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "slips")
+UPLOAD_DIR = "/app/uploads/slips"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 

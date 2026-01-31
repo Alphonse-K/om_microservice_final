@@ -35,9 +35,8 @@ procurement_router = APIRouter(prefix="/api/v1/procurements", tags=["Procurement
 company_router = APIRouter(prefix="/api/v1/companies", tags=["Companies"])
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src/ -> om_microservice_final/
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "slips")
-os.makedirs(UPLOAD_DIR, exist_ok=True)  # ensures folder exists
+UPLOAD_DIR = "/app/uploads/slips"
+
 # ==================== COMPANY ENDPOINTS ====================
 
 @company_router.get("/", response_model=List[CompanyResponse])
@@ -550,13 +549,12 @@ async def create_procurement_endpoint(
 
         file_path = None
         if slip:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"{timestamp}_{slip.filename}"
+            filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{slip.filename}"
             file_path = os.path.join(UPLOAD_DIR, filename)
 
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, "wb") as f:
-                f.write(await slip.read())
+                f.write(await slip.read())      
+
         from src.services.procurement_service import ProcurementService
         procurement = ProcurementService.create_procurement(
             db=db,

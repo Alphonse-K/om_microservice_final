@@ -27,6 +27,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy application code
 COPY --chown=appuser:appuser src/ /app/src/
 
+RUN mkdir -p /app/uploads/slips \
+    && chmod -R 755 /app/uploads
+    
 # Switch to non-root user
 USER appuser
 
