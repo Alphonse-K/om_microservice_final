@@ -35,8 +35,9 @@ procurement_router = APIRouter(prefix="/api/v1/procurements", tags=["Procurement
 company_router = APIRouter(prefix="/api/v1/companies", tags=["Companies"])
 
 
-UPLOAD_DIR = "uploads/slip"
-
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src/ -> om_microservice_final/
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads", "slips")
+os.makedirs(UPLOAD_DIR, exist_ok=True)  # ensures folder exists
 # ==================== COMPANY ENDPOINTS ====================
 
 @company_router.get("/", response_model=List[CompanyResponse])
@@ -532,7 +533,6 @@ async def create_procurement_endpoint(
     db: Session = Depends(get_db)
 ):
     try:
-        # Create schema object
         parsed_data = ProcurementCreate(
             company_id=company_id,
             country_id=country_id,
@@ -541,7 +541,7 @@ async def create_procurement_endpoint(
             amount=amount
         )
 
-        # Ensure procurement is for user's company
+        # Check user permission
         if current_user.role != "ADMIN" and current_user.company_id != parsed_data.company_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -557,9 +557,7 @@ async def create_procurement_endpoint(
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, "wb") as f:
                 f.write(await slip.read())
-
         from src.services.procurement_service import ProcurementService
-        # Create procurement
         procurement = ProcurementService.create_procurement(
             db=db,
             procurement_data=parsed_data,
@@ -567,7 +565,7 @@ async def create_procurement_endpoint(
             file_path=file_path
         )
 
-        # Build public URL for the slip
+        # Public URL for client
         slip_url = f"http://91.98.139.127:8000/procurements/slip/{Path(file_path).name}" if file_path else None
 
         return ProcurementResponse(
@@ -577,19 +575,24 @@ async def create_procurement_endpoint(
             bank_name=procurement.bank_name,
             slip_number=procurement.slip_number,
             amount=procurement.amount,
+            status=procurement.status,
+            initiation_date=procurement.initiation_date,
+            validation_date=procurement.validation_date,
+            slip_file_path=file_path,
             slip_file_url=slip_url,
-            status=procurement.status
+            initiated_by=procurement.initiated_by,
+            validated_by=procurement.validated_by,
+            notes=procurement.notes
         )
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error creating procurement: {e}")
+        logger.error(f"Error creating procurement: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create procurement: {e}"
-        )
-    
+            detail=f"Failed to create procurement: {str(e)}"
+        )        
 # Endpoint to serve uploaded slips
 @procurement_router.get("/slip/{filename}", response_class=FileResponse)
 async def get_procurement_slip(filename: str):
