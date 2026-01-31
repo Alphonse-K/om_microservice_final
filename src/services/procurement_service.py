@@ -26,19 +26,17 @@ class ProcurementService:
         file_path: str = None
     ) -> Procurement:
         """
-        Create a new procurement
-        
-        Note: Balance is NOT updated until procurement is approved
+        Create a new procurement.
+        Balance is NOT updated until procurement is approved.
         """
         try:
             # Check if slip number already exists
             existing = db.query(Procurement).filter(
                 Procurement.slip_number == procurement_data.slip_number
             ).first()
-            
             if existing:
                 raise ValueError(f"Slip number '{procurement_data.slip_number}' already exists")
-            
+
             data = procurement_data.model_dump(exclude={"slip_file_path"})
 
             procurement = Procurement(
@@ -52,11 +50,10 @@ class ProcurementService:
             db.add(procurement)
             db.commit()
             db.refresh(procurement)
-            
+
             logger.info(f"Procurement created: ID={procurement.id}, Amount={procurement.amount}")
-            
             return procurement
-            
+
         except IntegrityError as e:
             db.rollback()
             if "slip_number" in str(e):
@@ -64,9 +61,9 @@ class ProcurementService:
             raise
         except Exception as e:
             db.rollback()
-            logger.error(f"Error creating procurement: {str(e)}")
+            logger.error(f"Error creating procurement: {e}")
             raise
-    
+
     @staticmethod
     def approve_procurement(
         db: Session,

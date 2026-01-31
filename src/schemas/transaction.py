@@ -18,7 +18,6 @@ class DepositBase(BaseModel):
     description="ISO code of the destination country (e.g. CI, ML, SN)"
     )
     company_id: int
-
     
 
 # ------------------- Withdrawal -------------------
@@ -32,7 +31,6 @@ class WithdrawalBase(BaseModel):
     description="ISO code of the destination country (e.g. CI, ML, SN)"
     )
     company_id: int
-
     
 
 # ------------------- Airtime -------------------
@@ -403,7 +401,7 @@ class ProcurementBase(BaseModel):
     bank_name: str = Field(..., example="Ecobank Senegal")
     slip_number: str = Field(..., example="GN20241130001")
     amount: Decimal = Field(..., example="1000.00")
-    slip_file_path: Optional[str] = Field(None, example="/uploads/slips/slip123.pdf")
+    slip_file_path: str = Field(None, example="/uploads/slips/slip123.pdf")
     
     @field_validator('amount')
     @classmethod
@@ -470,20 +468,20 @@ class ProcurementResponse(BaseModel):
         }
     }
 
-class ProcurementResponse(ProcurementBase):
-    id: int = Field(..., example=1)
-    initiation_date: datetime = Field(..., example="2024-11-30T16:02:36.005Z")
-    validation_date: Optional[datetime] = Field(None, example="2024-11-30T16:02:36.005Z")
-    slip_file_path: Optional[str]
-    status: str = Field(..., example="pending")
+# class ProcurementResponse(ProcurementBase):
+#     id: int = Field(..., example=1)
+#     initiation_date: datetime = Field(..., example="2024-11-30T16:02:36.005Z")
+#     validation_date: Optional[datetime] = Field(None, example="2024-11-30T16:02:36.005Z")
+#     slip_file_path: Optional[str]
+#     status: str = Field(..., example="pending")
     
-    model_config = {
-        "from_attributes": True,
-        "json_encoders": {
-            Decimal: str,
-            datetime: lambda v: v.isoformat()
-        }
-    }
+#     model_config = {
+#         "from_attributes": True,
+#         "json_encoders": {
+#             Decimal: str,
+#             datetime: lambda v: v.isoformat()
+#         }
+#     }
 
 class UserLogin(BaseModel):
     email: EmailStr = Field(..., example="user@company.com")

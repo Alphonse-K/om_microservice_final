@@ -1,5 +1,8 @@
 from src.core.database import Base, engine
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+import os
+
 from src.routes.transaction import (
     transaction_router, 
     country_router, 
@@ -14,6 +17,10 @@ from src.routes.emails import email_router
 
 
 app = FastAPI(title="CashMoov API", version="1.0.0")
+
+UPLOAD_DIR = "./uploads/slips"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/procurements/slip", StaticFiles(directory=UPLOAD_DIR), name="procurement_slips")
 
 Base.metadata.create_all(bind=engine)
 

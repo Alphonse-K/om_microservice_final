@@ -35,8 +35,7 @@ procurement_router = APIRouter(prefix="/api/v1/procurements", tags=["Procurement
 company_router = APIRouter(prefix="/api/v1/companies", tags=["Companies"])
 
 
-UPLOAD_DIR = "uploads/procurements"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+UPLOAD_DIR = "uploads/slip"
 
 # ==================== COMPANY ENDPOINTS ====================
 
@@ -521,7 +520,6 @@ def approve(
         raise HTTPException(400, str(e))
 
 
-
 @procurement_router.post("/", response_model=ProcurementResponse)
 async def create_procurement_endpoint(
     company_id: int = Form(...),
@@ -534,6 +532,7 @@ async def create_procurement_endpoint(
     db: Session = Depends(get_db)
 ):
     try:
+        # Create schema object
         parsed_data = ProcurementCreate(
             company_id=company_id,
             country_id=country_id,
@@ -560,7 +559,7 @@ async def create_procurement_endpoint(
                 f.write(await slip.read())
 
         from src.services.procurement_service import ProcurementService
-
+        # Create procurement
         procurement = ProcurementService.create_procurement(
             db=db,
             procurement_data=parsed_data,
@@ -569,7 +568,7 @@ async def create_procurement_endpoint(
         )
 
         # Build public URL for the slip
-        slip_url = f"http://91.98.139.127:8000/api/v1/{Path(file_path).name}" if file_path else None
+        slip_url = f"http://91.98.139.127:8000/procurements/slip/{Path(file_path).name}" if file_path else None
 
         return ProcurementResponse(
             id=procurement.id,
@@ -585,12 +584,12 @@ async def create_procurement_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Error creating procurement: {str(e)}")
+        logger.error(f"Error creating procurement: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create procurement: {str(e)}"
+            detail=f"Failed to create procurement: {e}"
         )
-
+    
 # Endpoint to serve uploaded slips
 @procurement_router.get("/slip/{filename}", response_class=FileResponse)
 async def get_procurement_slip(filename: str):
