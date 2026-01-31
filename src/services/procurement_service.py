@@ -31,12 +31,11 @@ class ProcurementService:
         """
         try:
             # Check if slip number already exists
+            print(f"Checking slip_number: '{procurement_data.slip_number}'")
             existing = db.query(Procurement).filter(
                 Procurement.slip_number == procurement_data.slip_number
             ).first()
-            if existing:
-                raise ValueError(f"Slip number '{procurement_data.slip_number}' already exists")
-
+            print(f"Existing: {existing}")
             data = procurement_data.model_dump(exclude={"slip_file_path"})
 
             procurement = Procurement(
