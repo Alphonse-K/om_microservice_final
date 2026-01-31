@@ -26,16 +26,18 @@ class ProcurementService:
         file_path: str = None
     ) -> Procurement:
         """
-        Create a new procurement.
-        Balance is NOT updated until procurement is approved.
+        Create a new procurement record
         """
         try:
-            # Check if slip number already exists
-            print(f"Checking slip_number: '{procurement_data.slip_number}'")
+            logger.info(f"Checking slip_number: '{procurement_data.slip_number}'")
             existing = db.query(Procurement).filter(
                 Procurement.slip_number == procurement_data.slip_number
             ).first()
-            print(f"Existing: {existing}")
+            logger.info(f"Existing: {existing}")
+
+            if existing:
+                raise ValueError(f"Slip number '{procurement_data.slip_number}' already exists")
+
             data = procurement_data.model_dump(exclude={"slip_file_path"})
 
             procurement = Procurement(
@@ -55,12 +57,13 @@ class ProcurementService:
 
         except IntegrityError as e:
             db.rollback()
+            logger.error(f"IntegrityError: {str(e)}")
             if "slip_number" in str(e):
                 raise ValueError(f"Slip number '{procurement_data.slip_number}' already exists")
             raise
         except Exception as e:
             db.rollback()
-            logger.error(f"Error creating procurement: {e}")
+            logger.error(f"Error creating procurement: {str(e)}")
             raise
 
     @staticmethod
