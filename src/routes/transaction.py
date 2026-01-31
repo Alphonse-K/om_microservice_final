@@ -674,7 +674,12 @@ def get_procurement_summary_endpoint(
     summary = ProcurementService.get_procurement_summary(db, company_id)
     return summary
 
-@procurement_router.get("/")
+from pathlib import Path
+
+BASE_URL = "http://91.98.139.127:8000"
+
+
+@procurement_router.get("/", response_model=dict)
 def list_procurements_endpoint(
     company_id: Optional[int] = None,
     country_id: Optional[int] = None,
@@ -684,17 +689,12 @@ def list_procurements_endpoint(
     current_user: User = Depends(require_role(["ADMIN", "CHECKER", "MAKER", "USER"])),
     db: Session = Depends(get_db)
 ):
-    """
-    List procurements with filtering and pagination
-    
-    - Non-admins can only see their own company's procurements
-    """
     from src.services.procurement_service import ProcurementService
-    
-    # If not admin, restrict to user's company
+
+    # Non-admins can only see their company
     if current_user.role != "ADMIN":
         company_id = current_user.company_id
-    
+
     procurements, total = ProcurementService.get_procurements(
         db=db,
         company_id=company_id,
@@ -703,18 +703,31 @@ def list_procurements_endpoint(
         limit=limit,
         offset=offset
     )
-    
-    # Add balance info for approved procurements
+
+    response_items = []
+
     for proc in procurements:
+        # ORM → Pydantic
+        item = ProcurementResponse.model_validate(proc, from_attributes=True)
+
+        # Inject slip_file_url
+        if proc.slip_file_path:
+            item.slip_file_url = (
+                f"{BASE_URL}/procurements/slip/{Path(proc.slip_file_path).name}"
+            )
+
+        # Inject balance if exists
         if proc.balance:
-            proc.available_balance = proc.balance.available_balance
-    
+            item.available_balance = proc.balance.available_balance
+
+        response_items.append(item)
+
     return {
-        "procurements": procurements,
+        "procurements": response_items,
         "pagination": {
             "total": total,
             "limit": limit,
             "offset": offset,
-            "has_more": (offset + len(procurements)) < total
+            "has_more": (offset + len(response_items)) < total
         }
     }
