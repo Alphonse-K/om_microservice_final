@@ -36,6 +36,10 @@ company_router = APIRouter(prefix="/api/v1/companies", tags=["Companies"])
 
 
 UPLOAD_DIR = "/app/uploads/slips"
+BASE_URL = "http://91.98.139.127:8000"
+
+# Ensure upload directory exists at import time
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ==================== COMPANY ENDPOINTS ====================
 
@@ -531,66 +535,50 @@ async def create_procurement_endpoint(
     current_user: User = Depends(require_role(["ADMIN", "MAKER"])),
     db: Session = Depends(get_db)
 ):
-    try:
-        parsed_data = ProcurementCreate(
-            company_id=company_id,
-            country_id=country_id,
-            bank_name=bank_name,
-            slip_number=slip_number,
-            amount=amount
-        )
+    # Build schema
+    parsed_data = ProcurementCreate(
+        company_id=company_id,
+        country_id=country_id,
+        bank_name=bank_name,
+        slip_number=slip_number,
+        amount=amount
+    )
 
-        # Check user permission
-        if current_user.role != "ADMIN" and current_user.company_id != parsed_data.company_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You can only create procurements for your own company"
-            )
-
-        file_path = None
-        if slip:
-            filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{slip.filename}"
-            file_path = os.path.join(UPLOAD_DIR, filename)
-
-            with open(file_path, "wb") as f:
-                f.write(await slip.read())      
-
-        from src.services.procurement_service import ProcurementService
-        procurement = ProcurementService.create_procurement(
-            db=db,
-            procurement_data=parsed_data,
-            initiated_by_user_id=current_user.id,
-            file_path=file_path
-        )
-
-        # Public URL for client
-        slip_url = f"http://91.98.139.127:8000/procurements/slip/{Path(file_path).name}" if file_path else None
-
-        return ProcurementResponse(
-            id=procurement.id,
-            company_id=procurement.company_id,
-            country_id=procurement.country_id,
-            bank_name=procurement.bank_name,
-            slip_number=procurement.slip_number,
-            amount=procurement.amount,
-            status=procurement.status,
-            initiation_date=procurement.initiation_date,
-            validation_date=procurement.validation_date,
-            slip_file_path=file_path,
-            slip_file_url=slip_url,
-            initiated_by=procurement.initiated_by,
-            validated_by=procurement.validated_by,
-            notes=procurement.notes
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error creating procurement: {str(e)}")
+    # Permission check
+    if current_user.role != "ADMIN" and current_user.company_id != parsed_data.company_id:
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create procurement: {str(e)}"
-        )        
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only create procurements for your own company"
+        )
+
+    # Handle file upload
+    file_path = None
+    if slip:
+        filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{slip.filename}"
+        file_path = os.path.join(UPLOAD_DIR, filename)
+
+        with open(file_path, "wb") as f:
+            f.write(await slip.read())
+    from src.services.procurement_service import ProcurementService
+
+    # Create procurement
+    procurement = ProcurementService.create_procurement(
+        db=db,
+        procurement_data=parsed_data,
+        initiated_by_user_id=current_user.id,
+        file_path=file_path
+    )
+
+    # Return ORM → schema (clean & safe)
+    response = ProcurementResponse.model_validate(procurement, from_attributes=True)
+
+    # Inject public URL (computed field)
+    if file_path:
+        response.slip_file_url = f"{BASE_URL}/procurements/slip/{Path(file_path).name}"
+
+    return response
+
+
 # Endpoint to serve uploaded slips
 @procurement_router.get("/slip/{filename}", response_class=FileResponse)
 async def get_procurement_slip(filename: str):

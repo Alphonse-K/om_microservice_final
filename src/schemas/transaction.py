@@ -441,25 +441,28 @@ class ProcurementAction(BaseModel):
     )
 
 class ProcurementResponse(BaseModel):
-    """Enhanced response with balance info"""
-    id: int = Field(..., example=1)
+    id: int
     company_id: int
     country_id: int
-    balance_id: Optional[int]
+    balance_id: Optional[int] = None
+
     bank_name: str
     slip_number: str
     amount: Decimal
     status: str
+
     initiation_date: datetime
-    validation_date: Optional[datetime]
-    slip_file_path: Optional[str]
-    initiated_by: Optional[int]
-    validated_by: Optional[int]
-    notes: Optional[str]
-    
-    # Balance information
-    available_balance: Optional[Decimal] = Field(None, description="Balance after approval")
-    
+    validation_date: Optional[datetime] = None
+
+    slip_file_path: Optional[str] = None
+    slip_file_url: Optional[str] = None 
+
+    initiated_by: Optional[int] = None
+    validated_by: Optional[int] = None
+    notes: Optional[str] = None
+
+    available_balance: Optional[Decimal] = None
+
     model_config = {
         "from_attributes": True,
         "json_encoders": {
@@ -467,21 +470,6 @@ class ProcurementResponse(BaseModel):
             datetime: lambda v: v.isoformat()
         }
     }
-
-# class ProcurementResponse(ProcurementBase):
-#     id: int = Field(..., example=1)
-#     initiation_date: datetime = Field(..., example="2024-11-30T16:02:36.005Z")
-#     validation_date: Optional[datetime] = Field(None, example="2024-11-30T16:02:36.005Z")
-#     slip_file_path: Optional[str]
-#     status: str = Field(..., example="pending")
-    
-#     model_config = {
-#         "from_attributes": True,
-#         "json_encoders": {
-#             Decimal: str,
-#             datetime: lambda v: v.isoformat()
-#         }
-#     }
 
 class UserLogin(BaseModel):
     email: EmailStr = Field(..., example="user@company.com")
