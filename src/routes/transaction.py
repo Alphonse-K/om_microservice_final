@@ -1,10 +1,13 @@
 # src/routes/transactions.py (update your existing file)
 import os
 import json
+from pathlib import Path
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, status, Form
 from sqlalchemy.orm import Session
+from fastapi.responses import FileResponse
+
 from typing import List, Optional
 from src.models.transaction import User, ProcurementStatus
 from src.services.finance_service import FinanceService
@@ -518,16 +521,26 @@ def approve(
         raise HTTPException(400, str(e))
 
 
+
 @procurement_router.post("/", response_model=ProcurementResponse)
 async def create_procurement_endpoint(
-    data: str = Form(...),
+    company_id: int = Form(...),
+    country_id: int = Form(...),
+    bank_name: str = Form(...),
+    slip_number: str = Form(...),
+    amount: Decimal = Form(...),
     slip: UploadFile = File(None),
     current_user: User = Depends(require_role(["ADMIN", "MAKER"])),
     db: Session = Depends(get_db)
 ):
     try:
-        # Parse JSON manually!
-        parsed_data = ProcurementCreate(**json.loads(data))
+        parsed_data = ProcurementCreate(
+            company_id=company_id,
+            country_id=country_id,
+            bank_name=bank_name,
+            slip_number=slip_number,
+            amount=amount
+        )
 
         # Ensure procurement is for user's company
         if current_user.role != "ADMIN" and current_user.company_id != parsed_data.company_id:
@@ -540,7 +553,7 @@ async def create_procurement_endpoint(
         if slip:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             filename = f"{timestamp}_{slip.filename}"
-            file_path = f"{UPLOAD_DIR}/{filename}"
+            file_path = os.path.join(UPLOAD_DIR, filename)
 
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, "wb") as f:
@@ -554,8 +567,20 @@ async def create_procurement_endpoint(
             initiated_by_user_id=current_user.id,
             file_path=file_path
         )
-        
-        return procurement
+
+        # Build public URL for the slip
+        slip_url = f"http://91.98.139.127:8000/api/v1/{Path(file_path).name}" if file_path else None
+
+        return ProcurementResponse(
+            id=procurement.id,
+            company_id=procurement.company_id,
+            country_id=procurement.country_id,
+            bank_name=procurement.bank_name,
+            slip_number=procurement.slip_number,
+            amount=procurement.amount,
+            slip_file_url=slip_url,
+            status=procurement.status
+        )
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -565,6 +590,14 @@ async def create_procurement_endpoint(
             status_code=500,
             detail=f"Failed to create procurement: {str(e)}"
         )
+
+# Endpoint to serve uploaded slips
+@procurement_router.get("/slip/{filename}", response_class=FileResponse)
+async def get_procurement_slip(filename: str):
+    file_path = Path(UPLOAD_DIR) / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path)
 
 @procurement_router.post("/{procurement_id}/approve", response_model=ProcurementResponse)
 def approve_procurement_endpoint(
