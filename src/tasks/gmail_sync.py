@@ -100,7 +100,7 @@
 #     finally:
 #         db.close()
 #         logger.info(f"[{label}] DB session closed.")
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from src.core.database import SessionLocal
 from src.services.gmail_service import fetch_recent_emails
 from src.services.email_service import create_email, get_email_by_message_id
@@ -128,13 +128,20 @@ def sync_account(self, label: str, token_path: str):
             .order_by(EmailMessage.received_at.desc())
             .first()
         )
-        after_ts = int(latest_email.received_at.timestamp()) if latest_email else 0
-        logger.info(f"[{label}] Fetching emails after timestamp: {after_ts}")
+        # after_ts = int(latest_email.received_at.timestamp()) if latest_email else 0
+        if latest_email:
+            after_ts = int(latest_email.received_at.timestamp())
+            logger.info(f"[{label}] Incremental sync from {latest_email.received_at}")
+        else:
+            # Bootstrap: fetch last 1 hour
+            bootstrap_since = datetime.now(timezone.utc) - timedelta(hours=1)
+            after_ts = int(bootstrap_since.timestamp())
+            logger.info(f"[{label}] Fetching emails since {bootstrap_since}")
 
         # --- Fetch emails ---
         try:
             emails = fetch_recent_emails(
-                token_path, max_results=100, query=f"after:{after_ts}"
+                token_path, max_results=10, query=f"after:{after_ts}"
             )
             logger.info(f"[{label}] Fetched {len(emails)} emails.")
         except Exception as fetch_err:
