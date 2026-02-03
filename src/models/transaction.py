@@ -5,7 +5,6 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from src.core.database import Base
-from datetime import datetime, timezone
 from enum import Enum
 
 

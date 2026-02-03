@@ -143,6 +143,7 @@ def sync_account(self, label: str, token_path: str):
             emails = fetch_recent_emails(
                 token_path, max_results=10, query=f"after:{after_ts}"
             )
+
             logger.info(f"[{label}] Fetched {len(emails)} emails.")
         except Exception as fetch_err:
             logger.error(f"[{label}] Error fetching emails: {fetch_err}")
@@ -156,7 +157,7 @@ def sync_account(self, label: str, token_path: str):
             if get_email_by_message_id(db, msg_id):
                 logger.info(f"[{label}] Skipping duplicate email: {msg_id}")
                 continue
-
+            
             body_text = msg.get("body") or ""
 
             # Auto detect transaction type

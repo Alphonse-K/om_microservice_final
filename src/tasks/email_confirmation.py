@@ -28,17 +28,32 @@ def process_email_confirmation(self, email_id: int):
         if not parsed:
             logger.warning(f"[Email {email.id}] No transaction detected in email body.")
             return
+        print("\n=== PARSER OUTPUT ===")
+        print(parsed)
+        print("====================\n")
 
         # --- Enforce SUCCESS ONLY ---
         if parsed.get("status") != "success":
+            print(">>> EXIT: reason = <REPLACE_THIS>")
+
             logger.warning(
                 f"[Email {email.id}] Email does NOT contain a success phrase → skipping confirmation."
             )
             return
 
         # --- Try matching the transaction ---
+        print("\n=== MATCH INPUT ===")
+        print("tx_type:", parsed.get("transaction_type"))
+        print("msisdn:", parsed.get("msisdn"))
+        print("amount:", parsed.get("amount"), type(parsed.get("amount")))
+        print("===================\n")
+
         tx = find_matching_transaction(db, parsed)
+        print("MATCH RESULT:", tx)
+
         if not tx:
+            print(">>> EXIT: reason = <REPLACE_THIS>")
+
             logger.warning(
                 f"[Email {email.id}] No matching transaction found (msisdn={parsed.get('msisdn')}, amount={parsed.get('amount')})."
             )

@@ -18,11 +18,11 @@ from src.routes.emails import email_router
 
 app = FastAPI(title="CashMoov API", version="1.0.0")
 
-UPLOAD_DIR = "/app/uploads/slips"
+# UPLOAD_DIR = "/app/uploads/slips"
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-app.mount("/procurements/slip", StaticFiles(directory=UPLOAD_DIR), name="procurement_slips")
+# app.mount("/procurements/slip", StaticFiles(directory=UPLOAD_DIR), name="procurement_slips")
 
 Base.metadata.create_all(bind=engine)
 

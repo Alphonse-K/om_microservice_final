@@ -10,13 +10,6 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# def create_email(db: Session, paylaod: dict) -> EmailMessageCreate:
-#     # payload is a dict with fields matching EmailMessage
-#     email = EmailMessage(**paylaod)
-#     db.add(email)
-#     db.commit()
-#     db.refresh(email)
-#     return email
 
 def create_email(db: Session, payload: dict) -> EmailMessage:
     """
@@ -32,6 +25,7 @@ def create_email(db: Session, payload: dict) -> EmailMessage:
         parsed_transaction_id=payload.get("parsed_transaction_id"),
         received_at=payload.get("received_at"),  # <- ensure this is a datetime object
     )
+
     db.add(email_obj)
     db.commit()
     db.refresh(email_obj)

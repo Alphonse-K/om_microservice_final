@@ -65,8 +65,8 @@ def parse_transaction_email(body: str):
 
     # Patterns for each transaction type
     patterns = {
-        "withdrawal": r"retrait de (\d+) effectue\. montant ([\d\.]+)",
-        "deposit": r"depot vers (\d+) reussi\. montant ([\d\.]+)",
+        "cashout": r"retrait de (\d+) effectue\. montant ([\d\.]+)",
+        "cashin": r"depot vers (\d+) reussi\. montant ([\d\.]+)",
         "airtime": r"rechargement reussi\. montant de la transaction [: ]*([\d\.]+).*other msisdn (\d+)",
     }
 
@@ -91,11 +91,11 @@ def parse_transaction_email(body: str):
         }
 
     # Withdrawal
-    m = re.search(patterns["withdrawal"], body_l)
+    m = re.search(patterns["cashout"], body_l)
     if m:
         msisdn, amount = m.groups()
         return {
-            "transaction_type": "withdrawal",
+            "transaction_type": "cashout",
             "msisdn": msisdn,
             "amount": float(amount),
             "transaction_id": transaction_id,
@@ -103,11 +103,11 @@ def parse_transaction_email(body: str):
         }
 
     # Deposit
-    m = re.search(patterns["deposit"], body_l)
+    m = re.search(patterns["cashin"], body_l)
     if m:
         msisdn, amount = m.groups()
         return {
-            "transaction_type": "deposit",
+            "transaction_type": "cashin",
             "msisdn": msisdn,
             "amount": float(amount),
             "transaction_id": transaction_id,

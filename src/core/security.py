@@ -249,3 +249,4 @@ class SecurityUtils:
         """Verify HMAC signature"""
         expected_signature = SecurityUtils.generate_hmac_signature(secret, message)
         return hmac.compare_digest(expected_signature, signature)
+

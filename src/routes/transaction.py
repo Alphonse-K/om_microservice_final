@@ -35,11 +35,11 @@ procurement_router = APIRouter(prefix="/api/v1/procurements", tags=["Procurement
 company_router = APIRouter(prefix="/api/v1/companies", tags=["Companies"])
 
 
-UPLOAD_DIR = "/app/uploads/slips"
+# UPLOAD_DIR = "/app/uploads/slips"
 BASE_URL = "http://91.98.139.127:8000"
 
 # Ensure upload directory exists at import time
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ==================== COMPANY ENDPOINTS ====================
 

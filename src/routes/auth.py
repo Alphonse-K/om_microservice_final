@@ -9,9 +9,12 @@ from src.models.transaction import User
 from datetime import timezone
 import logging
 
+
 logger = logging.getLogger(__name__)
 
+
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
 
 @auth_router.post("/login", response_model=OTPResponse)
 def login(
