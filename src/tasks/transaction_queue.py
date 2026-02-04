@@ -122,7 +122,6 @@ class CountryRouter:
 
 
 # ----------------- PROCESS TRANSACTION QUEUE ----------------- #
-# ----------------- PROCESS TRANSACTION QUEUE ----------------- #
 @celery_app.task(bind=True, max_retries=3, name='src.tasks.transaction_queue.process_transaction_queue')
 def process_transaction_queue(self):
     db: Session = SessionLocal()
@@ -146,9 +145,6 @@ def process_transaction_queue(self):
                 db.add(req)
                 db.commit()
 
-                # ---------------------------------------------------
-                # Normalize transaction type
-                # ---------------------------------------------------
                 req_type = (req.transaction_type or "").strip().lower()
                 company_id = req.company_id
 
@@ -169,7 +165,6 @@ def process_transaction_queue(self):
                     raise Exception(f"No balance for company {company_id} in {destination_country.iso_code}")
 
                 amount_decimal = Decimal(str(req.amount))
-                held_amount = amount_decimal
 
                 # Calculate fees
                 fee_info = fee_calculator.calculate_fee(
@@ -179,8 +174,10 @@ def process_transaction_queue(self):
                     amount=amount_decimal
                 )
 
-                # Hold full amount in balance
-                balance_manager.hold_balance(db, company_id, destination_country.id, held_amount)
+                # Hold full amount only for debit-type transactions
+                if req_type in ("cashin", "airtime"):
+                    held_amount = amount_decimal
+                    balance_manager.hold_balance(db, company_id, destination_country.id, held_amount)
 
                 tx_data = {
                     "company_id": company_id,
@@ -193,13 +190,11 @@ def process_transaction_queue(self):
                     "status": "initiated",
                     "fee_amount": fee_info["fee_amount"],
                     "net_amount": amount_decimal,
-                    "before_balance": balance.available_balance + balance.held_balance + held_amount,
+                    "before_balance": balance.available_balance + balance.held_balance,
                     "after_balance": balance.available_balance + balance.held_balance,
                 }
 
-                # ---------------------------------------------------
                 # Convert amount to int for gateway
-                # ---------------------------------------------------
                 gateway_amount = int(amount_decimal)
 
                 # Transaction Routing
@@ -240,7 +235,7 @@ def process_transaction_queue(self):
 
             except Exception as e:
                 logger.error(f"Failed transaction id={req.id if req else 'N/A'}: {str(e)}", exc_info=True)
-                # Release held amount
+                # Release held amount if applicable
                 if held_amount and destination_country:
                     try:
                         balance_manager.release_balance(db, company_id, destination_country.id, held_amount, success=False)
