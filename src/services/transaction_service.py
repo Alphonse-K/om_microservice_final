@@ -55,6 +55,8 @@ def ussd_is_failure(text: str | None) -> bool:
         "too many",
         "not allowed",
         "limit",
+        "Depuis l URL 3PP, probleme de connexion",
+        "FAILURE"
     ]
 
     text_l = text.lower()
