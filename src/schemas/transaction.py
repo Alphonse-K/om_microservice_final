@@ -367,14 +367,13 @@ class FeeConfigBase(BaseModel):
 class FeeConfigCreate(FeeConfigBase):
     pass
 
-
 class FeeConfigUpdate(BaseModel):
+    fee_type: Optional[str] = None
     flat_fee: Optional[Decimal] = None
     percent_fee: Optional[Decimal] = None
     min_fee: Optional[Decimal] = None
     max_fee: Optional[Decimal] = None
     is_active: Optional[bool] = None
-
 
 class FeeConfigResponse(BaseModel):
     id: int
