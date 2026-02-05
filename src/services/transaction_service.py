@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta
+from fastapi import HTTPException, status
 from typing import List, Optional
 from sqlalchemy import or_, func
 from typing import Optional, List
@@ -486,36 +487,63 @@ def update_or_version_fee_config(
     db: Session,
     config_id: int,
     data: FeeConfigUpdate,
-    user: User
-):
-    old_config = get_fee_config(db, config_id)
-    if not old_config:
-        raise ValueError("Fee config not found")
+    current_user: User
+) -> FeeConfig:
 
-    # Case 1: PENDING → normal update
-    if old_config.status == "PENDING":
-        return update_fee_config(db, config_id, data)
+    config = db.query(FeeConfig).filter(FeeConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Fee config not found")
 
-    # Case 2: APPROVED → create new version
-    new_config = FeeConfig(
-        destination_country_id=old_config.destination_country_id,
-        transaction_type=old_config.transaction_type,
-        fee_type=data.fee_type or old_config.fee_type,
-        flat_fee=data.flat_fee or old_config.flat_fee,
-        percent_fee=data.percent_fee or old_config.percent_fee,
-        min_fee=data.min_fee or old_config.min_fee,
-        max_fee=data.max_fee or old_config.max_fee,
-        status="PENDING",
-        is_active=False,
-        previous_config_id=old_config.id,
-        created_by=user.id
+    # ==========================
+    # CASE 1: PENDING → update in place
+    # ==========================
+    if config.status == "PENDING":
+        for field, value in data.model_dump(exclude_unset=True).items():
+            setattr(config, field, value)
+
+        db.commit()
+        db.refresh(config)
+        return config
+
+    # ==========================
+    # CASE 2: APPROVED → VERSION IT
+    # ==========================
+    if config.status == "APPROVED":
+
+        # Safety: only one active config
+        config.is_active = False
+
+        new_config = FeeConfig(
+            transaction_type=config.transaction_type,
+            destination_country_id=config.destination_country_id,
+
+            fee_type=data.fee_type if data.fee_type is not None else config.fee_type,
+            flat_fee=data.flat_fee if data.flat_fee is not None else config.flat_fee,
+            percent_fee=data.percent_fee if data.percent_fee is not None else config.percent_fee,
+            min_fee=data.min_fee if data.min_fee is not None else config.min_fee,
+            max_fee=data.max_fee if data.max_fee is not None else config.max_fee,
+
+            version=config.version + 1,
+            previous_config_id=config.id,
+
+            status="PENDING",
+            is_active=False,
+            created_by=current_user.id,
+            created_at=datetime.now(timezone.utc)
+        )
+
+        db.add(new_config)
+        db.commit()
+        db.refresh(new_config)
+        return new_config
+
+    # ==========================
+    # CASE 3: Invalid state
+    # ==========================
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        f"Cannot update fee config with status {config.status}"
     )
-
-    db.add(new_config)
-    db.commit()
-    db.refresh(new_config)
-
-    return new_config
 
 def approve_fee_config(db: Session, config_id: int, user: User):
     config = get_fee_config(db, config_id)
