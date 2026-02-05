@@ -454,7 +454,6 @@ def create_fee_config(db: Session, data: FeeConfigCreate, user: User):
         **data.model_dump(),
         created_by=user.id,
         status="PENDING",
-        # is_active=False
     )
     db.add(config)
     db.commit()
@@ -472,11 +471,51 @@ def update_fee_config(db: Session, config_id: int, data: FeeConfigUpdate):
     config = get_fee_config(db, config_id)
     if not config:
         return None
+
+    if config.status == "APPROVED":
+        raise ValueError("Approved fee configs cannot be updated")
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(config, key, value)
+
     db.commit()
     db.refresh(config)
     return config
+
+def update_or_version_fee_config(
+    db: Session,
+    config_id: int,
+    data: FeeConfigUpdate,
+    user: User
+):
+    old_config = get_fee_config(db, config_id)
+    if not old_config:
+        raise ValueError("Fee config not found")
+
+    # Case 1: PENDING → normal update
+    if old_config.status == "PENDING":
+        return update_fee_config(db, config_id, data)
+
+    # Case 2: APPROVED → create new version
+    new_config = FeeConfig(
+        destination_country_id=old_config.destination_country_id,
+        transaction_type=old_config.transaction_type,
+        fee_type=data.fee_type or old_config.fee_type,
+        flat_fee=data.flat_fee or old_config.flat_fee,
+        percent_fee=data.percent_fee or old_config.percent_fee,
+        min_fee=data.min_fee or old_config.min_fee,
+        max_fee=data.max_fee or old_config.max_fee,
+        status="PENDING",
+        is_active=False,
+        previous_config_id=old_config.id,
+        created_by=user.id
+    )
+
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+
+    return new_config
 
 def approve_fee_config(db: Session, config_id: int, user: User):
     config = get_fee_config(db, config_id)
@@ -489,6 +528,13 @@ def approve_fee_config(db: Session, config_id: int, user: User):
     if config.status == "APPROVED":
         raise ValueError("Already approved")
 
+    # deactivate previous active config
+    db.query(FeeConfig).filter(
+        FeeConfig.destination_country_id == config.destination_country_id,
+        FeeConfig.transaction_type == config.transaction_type,
+        FeeConfig.is_active == True
+    ).update({"is_active": False})
+
     config.status = "APPROVED"
     config.is_active = True
     config.approved_by = user.id
@@ -497,4 +543,3 @@ def approve_fee_config(db: Session, config_id: int, user: User):
     db.commit()
     db.refresh(config)
     return config
-

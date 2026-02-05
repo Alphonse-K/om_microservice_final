@@ -38,7 +38,6 @@ def mark_stale_transactions():
     finally:
         db.close()
 
-
 # Celery wrapper
 from src.worker_app import celery_app
 

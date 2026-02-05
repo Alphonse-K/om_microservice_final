@@ -501,14 +501,15 @@ def update(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(["MAKER", "ADMIN"]))
 ):
-    config = get_fee_config(db, config_id)
-    if not config:
-        raise HTTPException(404, "Not found")
-
-    if config.status != "PENDING":
-        raise HTTPException(400, "Cannot update an already approved config")
-
-    return update_fee_config(db, config_id, data)
+    try:
+        return update_or_version_fee_config(
+            db=db,
+            config_id=config_id,
+            data=data,
+            user=current_user
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @fee_router.post("/{config_id}/approve", response_model=FeeConfigResponse)
 def approve(
