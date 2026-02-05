@@ -506,7 +506,7 @@ def update(
             db=db,
             config_id=config_id,
             data=data,
-            user=current_user
+            current_user=current_user
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
