@@ -76,6 +76,12 @@ class Company(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
+    theme = relationship(
+    "CompanyTheme",
+    back_populates="company",
+    uselist=False,
+    cascade="all, delete-orphan"
+    )
     users = relationship("User", back_populates="company")
     balances = relationship("CompanyCountryBalance", back_populates="company")
     procurements = relationship("Procurement", back_populates="company")

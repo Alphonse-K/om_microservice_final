@@ -654,3 +654,20 @@ class BalanceSummaryResponse(BaseModel):
             }
         }
     )
+
+
+class CompanyThemeBase(BaseModel):
+    theme_color: str = Field(..., example="purple")
+    theme_primary: Optional[str] = Field(None, example="#8B5CF6")
+    theme_secondary: Optional[str] = Field(None, example="#EC4899")
+    theme_angle: Optional[int] = Field(None, ge=0, le=360)
+    theme_is_solid: Optional[bool] = False
+
+
+class CompanyThemeCreateUpdate(CompanyThemeBase):
+    pass
+
+
+class CompanyThemeResponse(CompanyThemeBase):
+    class Config:
+        from_attributes = True
