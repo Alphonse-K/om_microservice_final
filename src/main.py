@@ -15,7 +15,7 @@ from src.routes.transaction import (
 from src.routes.auth import auth_router
 from src.routes.emails import email_router
 from src.routes.company_theme import theme_router
-
+import src.models
 
 app = FastAPI(title="CashMoov API", version="1.0.0")
 

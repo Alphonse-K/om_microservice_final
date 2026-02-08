@@ -28,4 +28,6 @@ def get_db():
 class Base(DeclarativeBase):
     pass
 
+import src.models
+
 
