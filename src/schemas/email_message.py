@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional
 
 
@@ -39,3 +39,14 @@ class EmailMessageResponse(EmailMessageInDBBase):
 class EmailMessageListResponse(BaseModel):
     emails: list[EmailMessageResponse]
     total: int
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetWithOTP(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=8)
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)

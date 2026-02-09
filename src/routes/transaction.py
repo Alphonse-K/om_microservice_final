@@ -17,7 +17,8 @@ from src.core.auth_dependencies import get_current_user, require_role
 from src.services.transaction_service import *
 from src.services.auth_service import AuthService
 from src.schemas.transaction import *
-from src.utils.files import save_image
+from src.utils.files import save_image  
+from src.schemas.email_message import PasswordResetRequest, PasswordResetWithOTP
  
 logger = logging.getLogger("router logging")
 logger.setLevel(logging.INFO)
@@ -446,29 +447,37 @@ def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )  
-@user_router.post("/reset-password")
-def reset_password(email: str, db: Session = Depends(get_db)):
-    """Enter your email address to receive password reset otp"""
-    return AuthService.request_password_reset(db, email)
+    
+@user_router.post("/reset-password", response_model=None)
+def reset_password(
+    payload: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    """Send password reset OTP"""
+    return AuthService.request_password_reset(db, payload.email)
 
-@user_router.post("/reset-password-with-otp")
+@user_router.post("/reset-password-with-otp", response_model=None)
 def reset_password_with_otp(
-    verify_data: OTPVerify, 
-    new_password: str, 
-    confirm_password: str,
-    db: Session = Depends(get_db), 
-    ):
-    """Reset password with the received OTP
-
-        Validates:
-        - New password must meet strength requirements
-        - New password must match confirmation
-    """
+    payload: PasswordResetWithOTP,
+    db: Session = Depends(get_db),
+):
+    """Reset password using OTP"""
     try:
-        return AuthService.reset_password_with_otp(db, verify_data, new_password, confirm_password)
+        return AuthService.reset_password_with_otp(
+            db=db,
+            email=payload.email,
+            otp=payload.otp,
+            new_password=payload.new_password,
+            confirm_password=payload.confirm_password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Password reset error : {str(e)}")
-        raise HTTPException(status.HTTP_500_BAD_REQUEST, detail="Internal server error")
+        logger.exception("Password reset error")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        )
 
 @finance_router.get("/balance/summary", response_model=BalanceSummaryResponse)
 def get_balance_summary(
