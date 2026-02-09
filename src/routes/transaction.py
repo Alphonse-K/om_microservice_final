@@ -446,7 +446,7 @@ def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )  
-@user_router.post("/reset-password", response_model=str)
+@user_router.post("/reset-password")
 def reset_password(db: Session, email: str):
     """Enter your email address to receive password reset otp"""
     return AuthService.request_password_reset(db, email)
