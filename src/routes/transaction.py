@@ -273,7 +273,7 @@ def upload_company_logo(
         db: Session = Depends(get_db)
 ):
     
-    company = db.query(Company).filter_by(company_id=company_id).first()
+    company = db.query(Company).filter_by(id=company_id).first()
 
     if not company:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Company not found")
