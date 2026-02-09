@@ -447,16 +447,16 @@ def change_password(
             detail="Internal server error"
         )  
 @user_router.post("/reset-password")
-def reset_password(db: Session, email: str):
+def reset_password(email: str, db: Session = Depends(get_db)):
     """Enter your email address to receive password reset otp"""
     return AuthService.request_password_reset(db, email)
 
 @user_router.post("/reset-password-with-otp")
 def reset_password_with_otp(
-    db: Session, 
     verify_data: OTPVerify, 
     new_password: str, 
-    confirm_password: str
+    confirm_password: str,
+    db: Session = Depends(get_db), 
     ):
     """Reset password with the received OTP
 
