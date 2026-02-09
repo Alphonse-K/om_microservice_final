@@ -464,11 +464,11 @@ def reset_password_with_otp(
     """Reset password using OTP"""
     try:
         return AuthService.reset_password_with_otp(
-            db=db,
-            email=payload.email,
-            otp=payload.otp,
-            new_password=payload.new_password,
-            confirm_password=payload.confirm_password,
+            db,
+            payload.email,
+            payload.otp,
+            payload.new_password,
+            payload.confirm_password,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

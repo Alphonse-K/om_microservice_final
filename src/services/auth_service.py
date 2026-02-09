@@ -493,10 +493,12 @@ class AuthService:
     @staticmethod
     def reset_password_with_otp(
             db: Session,
-            verify_data: OTPVerify,
+            email: str,
+            otp: str,
             new_password: str,
             confirm_password: str
     ):
+        verify_data = OTPVerify(email, otp)
         
         user = AuthService.verify_otp(db, verify_data, "password_reset")
 
