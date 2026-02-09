@@ -500,6 +500,8 @@ class AuthService:
     ):
         verify_data = OTPVerify(email=email, otp_code=otp)
 
+        print(f"Here is the user: {user}")
+        print(verify_data)
         user = AuthService.verify_otp(db, verify_data, "password_reset")
 
         if not user:
