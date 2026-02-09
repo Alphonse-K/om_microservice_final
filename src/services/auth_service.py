@@ -500,9 +500,9 @@ class AuthService:
     ):
         verify_data = OTPVerify(email=email, otp_code=otp)
 
-        print(f"Here is the user: {user}")
         print(verify_data)
         user = AuthService.verify_otp(db, verify_data, "password_reset")
+        print(f"Here is the user: {user}")
 
         if not user:
             raise HTTPException(401, detail=f"Invalid or Expired OTP")
