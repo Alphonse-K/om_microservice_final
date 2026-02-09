@@ -59,7 +59,6 @@ def login(
         }
     }
 
-
 @auth_router.post("/verify-otp", response_model=TokenResponse)
 def verify_otp(
     verify_data: OTPVerify, 

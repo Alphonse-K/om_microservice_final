@@ -17,6 +17,7 @@ from src.core.auth_dependencies import get_current_user, require_role
 from src.services.transaction_service import *
 from src.services.auth_service import AuthService
 from src.schemas.transaction import *
+from src.utils.files import save_image
  
 logger = logging.getLogger("router logging")
 logger.setLevel(logging.INFO)
@@ -263,6 +264,30 @@ def get_company_by_email_endpoint(
         )
     return company
 
+@company_router.post("/logo", response_model=dict)
+def upload_company_logo(
+        company_id: int,
+        file: UploadFile = File(...),
+        current_user: User = Depends(require_role(["ADMIN"])),
+        db: Session = Depends(get_db)
+):
+    
+    company = db.query(Company).filter_by(company_id=company_id).first()
+
+    if not company:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Company not found")
+    
+    if file.content_type not in ("image/png", "image/jpeg", "image/jpg", "image/webp"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+    
+    logo_path = save_image(file, folder="companies_logos")
+    company.company_logo = logo_path
+
+    db.commit()
+    db.refresh(company)
+
+    return {"message": "Company logos uploaded", "logo_path": logo_path}
+
 # ---------------------- DEPOSIT ----------------------
 @transaction_router.post("/send/orange-money/", response_model=QueuedTransactionResponse)
 async def send_deposit(deposit: DepositCreate, db: Session = Depends(get_db)):
@@ -371,7 +396,6 @@ def update_user_endpoint(
     user = AuthService.update_user(db, user_id, update_data)
     return user
 
-
 @user_router.post("/change-password", response_model=PasswordChangeResponse)
 def change_password(
     password_data: PasswordChange,
@@ -422,6 +446,29 @@ def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )  
+@user_router.post("/reset-password", response_model=str)
+def reset_password(db: Session, email: str):
+    """Enter your email address to receive password reset otp"""
+    return AuthService.request_password_reset(db, email)
+
+@user_router.post("/reset-password-with-otp")
+def reset_password_with_otp(
+    db: Session, 
+    verify_data: OTPVerify, 
+    new_password: str, 
+    confirm_password: str
+    ):
+    """Reset password with the received OTP
+
+        Validates:
+        - New password must meet strength requirements
+        - New password must match confirmation
+    """
+    try:
+        return AuthService.reset_password_with_otp(db, verify_data, new_password, confirm_password)
+    except Exception as e:
+        logger.error(f"Password reset error : {str(e)}")
+        raise HTTPException(status.HTTP_500_BAD_REQUEST, detail="Internal server error")
 
 @finance_router.get("/balance/summary", response_model=BalanceSummaryResponse)
 def get_balance_summary(

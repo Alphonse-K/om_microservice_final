@@ -212,6 +212,7 @@ class CompanyBase(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
     is_active: bool = True
+    company_logo: Optional[str] = None
 
 class CompanyCreate(CompanyBase):
     pass
@@ -235,7 +236,6 @@ class CompanyStatsResponse(BaseModel):
     total_transactions: int
     transaction_breakdown: Dict[str, int]
     recent_transactions: List[Dict[str, Any]] = []
-
 
 class CompanyBalanceBase(BaseModel):
     """Base schema for company country balance"""

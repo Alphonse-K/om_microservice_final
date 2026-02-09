@@ -133,9 +133,8 @@ class AuthService:
                 user.email,
                 user.name,
                 otp_code,
-                otp_type  # This should be passed
-            )
-            
+                otp_type 
+            )           
             if email_sent:
                 logger.info(f"✓ OTP email sent successfully to {user.email}")
             else:
@@ -146,7 +145,6 @@ class AuthService:
         
         logger.info(f"=== END generate_otp for user: {user.email} ===")
         return otp_code
-
 
     @staticmethod
     def verify_otp(db: Session, verify_data: OTPVerify, otp_type: str = "login") -> Optional[User]:
@@ -480,6 +478,41 @@ class AuthService:
         db.commit()
         return True
     
+    @staticmethod
+    def request_password_reset(db: Session, email: str):
+
+        user = db.query(User).filter_by(email=email).first()
+
+        if not user:
+            raise HTTPException(404, detail=f"User not found with email: {email}")
+        
+        otp = AuthService.generate_otp(db, user, "password reset")
+
+        return "Password reset OTP sent to your email"
+    
+    @staticmethod
+    def reset_password_with_otp(
+            db: Session,
+            verify_data: OTPVerify,
+            new_password: str,
+            confirm_password: str
+    ):
+        
+        user = AuthService.verify_otp(db, verify_data, "password_reset")
+
+        if not user:
+            raise HTTPException(401, detail=f"Invalid or Expired OTP")
+
+        if new_password != confirm_password:
+            raise HTTPException(400, detail=f"Passwords do not match")
+        
+        user.password_hash = SecurityUtils.hash_password(new_password)
+
+        db.commit()
+
+        return True, "Password reset successfully"
+
+
     # ==================== API KEY MANAGEMENT ====================
     @staticmethod
     def create_api_key(db: Session, company_id: int, create_data: APIKeyCreate) -> dict:

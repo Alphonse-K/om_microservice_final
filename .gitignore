@@ -89,10 +89,3 @@ node_modules/
 *.local
 *.backup
 
-# Gmail / Google API credentials
-credentials/
-*.json
-airtime_credentials.json
-withdrawal_credentials.json
-withdrawal_token.json
-airtime_token.json

@@ -74,6 +74,7 @@ class Company(Base):
     address = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    company_logo = Column(String(255), nullable=True)
 
     # Relationships
     theme = relationship(
@@ -91,6 +92,11 @@ class Company(Base):
     deposit_transactions = relationship("DepositTransaction", back_populates="company")
     withdrawal_transactions = relationship("WithdrawalTransaction", back_populates="company")
     airtime_purchases = relationship("AirtimePurchase", back_populates="company")
+    fee_configs = relationship(
+        "FeeConfig",
+        back_populates="company",
+        cascade="all, delete-orphan"
+    )
 
 
 class User(Base):
@@ -225,53 +231,6 @@ class CompanyCountryBalance(Base):
         return self.available_balance - self.held_balance
 
 
-# class FeeConfig(Base):
-#     __tablename__ = "fee_configs"
-
-#     id = Column(Integer, primary_key=True, index=True)
-
-#     transaction_type = Column(
-#         SAEnum(TransactionType, name="transaction_type_enum"),
-#         nullable=False
-#     )
-
-#     destination_country_id = Column(
-#         Integer,
-#         ForeignKey("countries.id"),
-#         nullable=False
-#     )
-
-#     # Fee calculation
-#     fee_type = Column(String(20), nullable=False)  # flat, percent, mixed
-#     flat_fee = Column(Numeric(10, 6), default=0)
-#     percent_fee = Column(Numeric(10, 6), default=0)
-#     min_fee = Column(Numeric(10, 6), default=0)
-#     max_fee = Column(Numeric(10, 6), nullable=True)
-
-#     # Workflow fields
-#     status = Column(String(20), default="PENDING")
-#     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-#     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-#     approved_at = Column(DateTime(timezone=True), nullable=True)
-
-#     is_active = Column(Boolean, default=False)
-#     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-#     destination_country = relationship(
-#         "Country",
-#         foreign_keys=[destination_country_id],
-#         back_populates="fee_configs_destination"
-#     )
-
-#     __table_args__ = (
-#         UniqueConstraint(
-#             "transaction_type",
-#             "destination_country_id",
-#             "is_active",
-#             name="uix_fee_active_rule"
-#         ),
-#     )
-
 class FeeConfig(Base):
     __tablename__ = "fee_configs"
 
@@ -286,6 +245,13 @@ class FeeConfig(Base):
         Integer,
         ForeignKey("countries.id"),
         nullable=False
+    )
+
+    company_id = Column(
+            Integer,
+            ForeignKey("companies.id"),
+            nullable=False,
+            index=True
     )
 
     # ==========================
@@ -331,14 +297,18 @@ class FeeConfig(Base):
         back_populates="fee_configs_destination"
     )
 
+    company = relationship("Company", back_populates="fee_configs")
+
     __table_args__ = (
-        UniqueConstraint(
-            "transaction_type",
-            "destination_country_id",
-            "is_active",
-            name="uix_fee_active_rule"
-        ),
+            UniqueConstraint(
+                "company_id",
+                "transaction_type",
+                "destination_country_id",
+                "is_active",
+                name="uix_fee_active_rule"
+            ),
     )
+
 
 class Procurement(Base):
     __tablename__ = "procurements"
