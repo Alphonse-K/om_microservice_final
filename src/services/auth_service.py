@@ -510,7 +510,7 @@ class AuthService:
 
 
         print(verify_data)
-        user = AuthService.verify_otp(db, verify_data, "password_reset")
+        user = AuthService.verify_otp(db, verify_data, "password reset")
         print(f"Here is the user: {user}")
 
         if not user:
