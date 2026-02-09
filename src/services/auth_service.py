@@ -163,8 +163,16 @@ class AuthService:
             
             if not otp_record:
                 logger.warning(f"Invalid OTP attempt for email: {verify_data.email}")
-                return None
-            
+                
+                # Debug: check what exists in DB for this user and purpose
+                records = db.query(OTPCode).join(User).filter(
+                    User.email == verify_data.email,
+                    OTPCode.purpose == otp_type
+                ).all()
+                logger.debug(f"Existing OTP records for this email/purpose: {records}")
+                
+                return None 
+                       
             # Mark OTP as used
             otp_record.is_used = True
             otp_record.used_at = datetime.now(timezone.utc)
@@ -499,6 +507,7 @@ class AuthService:
             confirm_password: str
     ):
         verify_data = OTPVerify(email=email, otp_code=otp)
+
 
         print(verify_data)
         user = AuthService.verify_otp(db, verify_data, "password_reset")
