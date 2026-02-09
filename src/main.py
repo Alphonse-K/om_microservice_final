@@ -20,10 +20,14 @@ import src.models
 app = FastAPI(title="CashMoov API", version="1.0.0")
 
 UPLOAD_DIR = "/app/uploads/slips"
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
 app.mount("/procurements/slip", StaticFiles(directory=UPLOAD_DIR), name="procurement_slips")
+
+# Company logos
+COMPANY_LOGO_DIR = "/app/uploads/companies_logos"
+os.makedirs(COMPANY_LOGO_DIR, exist_ok=True)
+app.mount("/uploads/companies_logos", StaticFiles(directory=COMPANY_LOGO_DIR), name="company_logos")
+
 
 Base.metadata.create_all(bind=engine)
 
