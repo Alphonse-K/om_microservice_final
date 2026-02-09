@@ -498,8 +498,8 @@ class AuthService:
             new_password: str,
             confirm_password: str
     ):
-        verify_data = OTPVerify(email, otp)
-        
+        verify_data = OTPVerify(email=email, otp=otp)
+
         user = AuthService.verify_otp(db, verify_data, "password_reset")
 
         if not user:
