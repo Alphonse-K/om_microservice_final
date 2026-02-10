@@ -523,3 +523,14 @@ class PendingTransaction(Base):
     deposit_transactions = relationship("DepositTransaction", back_populates="pending_transaction")
     withdrawal_transactions = relationship("WithdrawalTransaction", back_populates="pending_transaction")
     airtime_purchases = relationship("AirtimePurchase", back_populates="pending_transaction")
+
+
+class Bank(Base):
+    __tablename__ = "banks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    account_number = Column(String(255), nullable=True)
+    created_by = Column(String(50), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

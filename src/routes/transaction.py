@@ -589,7 +589,7 @@ async def create_procurement_endpoint(
     slip_number: str = Form(...),
     amount: Decimal = Form(...),
     slip: UploadFile = File(None),
-    current_user: User = Depends(require_role(["ADMIN", "MAKER"])),
+    current_user: User = Depends(require_role(["ADMIN", "MAKER" "USER"])),
     db: Session = Depends(get_db)
 ):
     # Build schema
@@ -788,3 +788,4 @@ def list_procurements_endpoint(
             "has_more": (offset + len(response_items)) < total
         }
     }
+    

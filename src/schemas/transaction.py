@@ -316,7 +316,7 @@ class FeeConfigBase(BaseModel):
     destination_country_id: int = Field(
         ..., example=2, description="ID of the destination/receiving country"
     )
-    
+
     company_id: int = Field(..., example=2, description="ID Of the company for which the fee is configured")
 
     fee_type: str = Field(
@@ -674,3 +674,18 @@ class CompanyThemeCreateUpdate(CompanyThemeBase):
 class CompanyThemeResponse(CompanyThemeBase):
     class Config:
         from_attributes = True
+
+
+class BankBase(BaseModel):
+    name: str = Field(..., examples="UBA")
+    account_number: Optional[str]
+
+class BankCreateUpdate(BankBase):
+    pass 
+
+class BankResponse(BankBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
