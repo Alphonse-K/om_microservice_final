@@ -677,7 +677,7 @@ class CompanyThemeResponse(CompanyThemeBase):
 
 
 class BankBase(BaseModel):
-    name: str = Field(..., examples="UBA")
+    name: str = Field(..., examples=["UBA"])
     account_number: Optional[str]
 
 class BankCreateUpdate(BankBase):
