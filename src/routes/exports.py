@@ -17,7 +17,7 @@ from src.exports.csv_exporter import export_csv_from_dicts, export_excel_from_di
 export_router = APIRouter(prefix="/api/v1", tags=["Export Reports"])
 
 
-@export_router.post("/exports/financial-transactions")
+@export_router.get("/exports/financial-transactions")
 def export_financial_transactions(
     format: str = "csv",
     company_id: int | None = None,
