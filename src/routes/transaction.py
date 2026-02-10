@@ -476,7 +476,7 @@ def reset_password_with_otp(
         logger.exception("Password reset error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error"
+            detail="Internal server error. Check your logic"
         )
 
 @finance_router.get("/balance/summary", response_model=BalanceSummaryResponse)

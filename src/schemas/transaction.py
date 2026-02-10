@@ -316,6 +316,8 @@ class FeeConfigBase(BaseModel):
     destination_country_id: int = Field(
         ..., example=2, description="ID of the destination/receiving country"
     )
+    
+    company_id: int = Field(..., example=2, description="ID Of the company for which the fee is configured")
 
     fee_type: str = Field(
         ..., example="percent", description="Either 'flat' or 'percent'"
@@ -379,6 +381,7 @@ class FeeConfigResponse(BaseModel):
     id: int
     transaction_type: TransactionType
     destination_country_id: int
+    company_id: int
     fee_type: str
     flat_fee: Decimal
     percent_fee: Decimal
