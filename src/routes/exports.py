@@ -14,7 +14,7 @@ from src.exports.financial_normalizer import normalize_financial_row, FINANCIAL_
 from src.exports.csv_exporter import export_csv_from_dicts, export_excel_from_dicts
 
 
-export_router = APIRouter(prefix="/api/v1/", tags=["Export Reports"])
+export_router = APIRouter(prefix="/api/v1", tags=["Export Reports"])
 
 
 @export_router.post("/exports/financial-transactions")
