@@ -1,3 +1,7 @@
+from datetime import datetime
+from typing import Literal
+from pydantic import BaseModel
+
 from src.models.transaction import (
     DepositTransaction,
     WithdrawalTransaction,
@@ -52,6 +56,38 @@ def normalize_financial_row(row):
             "gateway_transaction_id": row.gateway_transaction_id,
             "created_at": row.created_at,
         }
+
+def apply_common_filters(query, model, filters):
+    if filters.company_id:
+        query = query.filter(model.company_id == filters.company_id)
+
+    if filters.country_id:
+        query = query.filter(model.country_id == filters.country_id)
+
+    if filters.status:
+        query = query.filter(model.status == filters.status)
+
+    if filters.start_date:
+        query = query.filter(model.created_at >= filters.start_date)
+
+    if filters.end_date:
+        query = query.filter(model.created_at <= filters.end_date)
+
+    return query
+
+
+TransactionType = Literal["cashin", "cashout", "airtime"]
+TransactionStatus = Literal[
+    "pending", "success", "failed", "reversed"
+]
+
+class FinancialExportFilters(BaseModel):
+    transaction_type: TransactionType | None = None
+    status: TransactionStatus | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    company_id: int | None = None
+    country_id: int | None = None
 
 
 FINANCIAL_COLUMNS = [
