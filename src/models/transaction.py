@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, Text, Numeric, String, DateTime, Boolean, ForeignKey, 
+    Column, Integer, Text, Numeric, String, DateTime, Boolean, ForeignKey, Sequence, BigInteger,
     UniqueConstraint, Enum as SAEnum, JSON, Index
 )
 from sqlalchemy.sql import func
@@ -350,7 +350,14 @@ class Procurement(Base):
 # ========== DEPOSIT TRANSACTION ==========
 class DepositTransaction(Base):
     __tablename__ = "deposit_transactions"
-    
+    transaction_token = Column(
+        BigInteger,
+        Sequence("global_transaction_token_seq"),
+        server_default=Sequence("global_transaction_token_seq").next_value(),
+        unique=True,
+        index=True,
+        nullable=False
+    )
     # Primary key
     id = Column(Integer, primary_key=True, index=True)
     
@@ -403,7 +410,14 @@ class WithdrawalTransaction(Base):
     
     # Primary key
     id = Column(Integer, primary_key=True, index=True)
-    
+    transaction_token = Column(
+        BigInteger,
+        Sequence("global_transaction_token_seq"),
+        server_default=Sequence("global_transaction_token_seq").next_value(),
+        unique=True,
+        index=True,
+        nullable=False
+    )
     # Transaction details
     amount = Column(Numeric(14, 2), nullable=False)
     sender = Column(String(20), nullable=False)
@@ -453,7 +467,14 @@ class AirtimePurchase(Base):
     
     # Primary key
     id = Column(Integer, primary_key=True, index=True)
-    
+    transaction_token = Column(
+        BigInteger,
+        Sequence("global_transaction_token_seq"),
+        server_default=Sequence("global_transaction_token_seq").next_value(),
+        unique=True,
+        index=True,
+        nullable=False
+    )
     # Transaction details
     amount = Column(Numeric(14, 2), nullable=False)
     recipient = Column(String(20), nullable=False)
