@@ -63,6 +63,7 @@ class AirtimeCreate(AirtimeBase):
 
 class DepositResponse(BaseModel):
     id: int
+    transaction_token: int
     amount: Decimal
     recipient: str
     status: str
@@ -95,6 +96,7 @@ class DepositResponse(BaseModel):
 
 class WithdrawalResponse(BaseModel):
     id: int
+    transaction_token: int
     amount: Decimal
     sender: str
     status: str
@@ -128,6 +130,7 @@ class WithdrawalResponse(BaseModel):
 
 class AirtimeResponse(BaseModel):
     id: int
+    transaction_token: int
     amount: Decimal
     recipient: str
     status: str
