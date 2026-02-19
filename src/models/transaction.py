@@ -364,6 +364,8 @@ class DepositTransaction(Base):
     # Transaction details
     amount = Column(Numeric(14, 2), nullable=False)
     recipient = Column(String(20), nullable=False)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
     status = Column(String(20), default='initiated')
     
     # Foreign keys
@@ -421,6 +423,8 @@ class WithdrawalTransaction(Base):
     # Transaction details
     amount = Column(Numeric(14, 2), nullable=False)
     sender = Column(String(20), nullable=False)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
     status = Column(String(20), default='initiated')
     
     # Foreign keys
@@ -478,6 +482,8 @@ class AirtimePurchase(Base):
     # Transaction details
     amount = Column(Numeric(14, 2), nullable=False)
     recipient = Column(String(20), nullable=False)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
     status = Column(String(20), default='initiated')
     
     # Foreign keys
@@ -528,6 +534,8 @@ class PendingTransaction(Base):
         nullable=False
     )
     msisdn = Column(String(20), nullable=False)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
     amount = Column(Numeric(14, 2), nullable=False)
     partner_id = Column(String(100), nullable=False)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False)

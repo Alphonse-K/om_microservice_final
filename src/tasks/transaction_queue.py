@@ -182,6 +182,8 @@ def process_transaction_queue(self):
                 tx_data = {
                     "company_id": company_id,
                     "pending_transaction_id": req.id,
+                    "first_name": req.first_name,
+                    "last_name": req.last_name,
                     "amount": amount_decimal,
                     "country_id": destination_country.id,
                     "balance_id": balance.id,

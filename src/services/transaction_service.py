@@ -102,6 +102,8 @@ async def create_deposit(db: Session, deposit: DepositCreate):
     pending = PendingTransaction(
         transaction_type="cashin",
         msisdn=deposit.recipient,
+        first_name=deposit.first_name,
+        last_name=deposit.last_name,
         amount=deposit.amount,
         partner_id=deposit.partner_id,
         country_iso=deposit.destination_country_iso,
@@ -125,6 +127,8 @@ async def initiate_withdrawal_transaction(db: Session, withdrawal: WithdrawalCre
     pending = PendingTransaction(
         transaction_type="cashout",
         msisdn=withdrawal.sender,
+        first_name=withdrawal.first_name,
+        last_name=withdrawal.last_name,
         amount=withdrawal.amount,
         partner_id=withdrawal.partner_id,
         country_iso=withdrawal.destination_country_iso,
@@ -148,6 +152,8 @@ async def create_airtime_purchase(db: Session, airtime: AirtimeCreate):
     pending = PendingTransaction(
         transaction_type="airtime",
         msisdn=airtime.recipient,
+        first_name=airtime.first_name,
+        last_name=airtime.last_name,
         amount=airtime.amount,
         partner_id=airtime.partner_id,
         country_iso=airtime.destination_country_iso,

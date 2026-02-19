@@ -11,6 +11,8 @@ from src.models.transaction import TransactionType
 class DepositBase(BaseModel):
     recipient: str = Field(..., min_length=9, max_length=15)
     amount: Decimal = Field(..., ge=2000, le=15_000_000)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     transaction_type: TransactionType = Field(..., description="Type of transaction (e.g., CASHIN, CASHOUT)")
     partner_id: str = Field(..., max_length=100)
     destination_country_iso: str = Field(
@@ -24,6 +26,8 @@ class DepositBase(BaseModel):
 class WithdrawalBase(BaseModel):
     sender: str = Field(..., min_length=9, max_length=15)
     amount: Decimal = Field(..., ge=2000, le=15_000_000)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     transaction_type: TransactionType = Field(..., description="Type of transaction (e.g., CASHIN, CASHOUT)")
     partner_id: str = Field(..., max_length=100)
     destination_country_iso: str = Field(
@@ -37,6 +41,8 @@ class WithdrawalBase(BaseModel):
 class AirtimeBase(BaseModel):
     recipient: str = Field(..., min_length=9, max_length=15)
     amount: Decimal = Field(..., ge=1000, le=250_000)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     transaction_type: TransactionType = Field(..., description="Type of transaction (e.g., CASHIN, CASHOUT)")
     partner_id: str = Field(..., max_length=100)
     destination_country_iso: str = Field(
@@ -66,6 +72,8 @@ class DepositResponse(BaseModel):
     transaction_token: int
     amount: Decimal
     recipient: str
+    first_name: str
+    last_name: str
     status: str
 
     company_id: int
@@ -99,8 +107,9 @@ class WithdrawalResponse(BaseModel):
     transaction_token: int
     amount: Decimal
     sender: str
+    first_name: str
+    last_name: str
     status: str
-
     company_id: int
     country_id: int
     balance_id: int | None
@@ -133,6 +142,8 @@ class AirtimeResponse(BaseModel):
     transaction_token: int
     amount: Decimal
     recipient: str
+    first_name: str
+    last_name: str
     status: str
 
     company_id: int
@@ -168,6 +179,8 @@ class QueuedTransactionResponse(BaseModel):
     transaction_type: str
     amount: Decimal
     msisdn: str
+    first_name: str
+    last_name: str
     status: str
     company_id: int
     partner_id: str
