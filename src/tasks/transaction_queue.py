@@ -41,7 +41,7 @@ class BalanceManager:
         if balance.available_balance < amount:
             raise Exception(f"Insufficient available balance. Available: {balance.available_balance}, Required: {amount}")
 
-        balance.available_balance -= amount
+        # balance.available_balance -= amount
         balance.held_balance += amount
         db.add(balance)
         db.commit()
