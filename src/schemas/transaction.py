@@ -72,8 +72,8 @@ class DepositResponse(BaseModel):
     transaction_token: int
     amount: Decimal
     recipient: str
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     status: str
 
     company_id: int
@@ -107,8 +107,8 @@ class WithdrawalResponse(BaseModel):
     transaction_token: int
     amount: Decimal
     sender: str
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     status: str
     company_id: int
     country_id: int
@@ -142,8 +142,8 @@ class AirtimeResponse(BaseModel):
     transaction_token: int
     amount: Decimal
     recipient: str
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     status: str
 
     company_id: int
@@ -179,8 +179,8 @@ class QueuedTransactionResponse(BaseModel):
     transaction_type: str
     amount: Decimal
     msisdn: str
-    first_name: str
-    last_name: str
+    first_name: str | None = None
+    last_name: str | None = None
     status: str
     company_id: int
     partner_id: str
