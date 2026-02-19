@@ -32,6 +32,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
     if isinstance(transaction, (DepositTransaction, AirtimePurchase)):
         # Debit-type: consume held
         balance.held_balance -= transaction.amount
+        balance.available_balance -= transaction.amount
 
     elif isinstance(transaction, WithdrawalTransaction):
         # Credit-type: directly increase available
