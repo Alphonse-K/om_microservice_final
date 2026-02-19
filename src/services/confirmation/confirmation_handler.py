@@ -26,7 +26,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
     if not balance:
         raise ValueError(f"Balance {transaction.balance_id} not found")
 
-    transaction.before_balance = balance.available_balance + balance.held_balance
+    transaction.before_balance = balance.available_balance
 
     # 3️⃣ Apply money logic by transaction type
     if isinstance(transaction, (DepositTransaction, AirtimePurchase)):
@@ -41,7 +41,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
     else:
         raise ValueError(f"Unsupported transaction type {type(transaction)}")
 
-    transaction.after_balance = balance.available_balance + balance.held_balance
+    transaction.after_balance = balance.available_balance
 
     # 4️⃣ Commit
     db.commit()
