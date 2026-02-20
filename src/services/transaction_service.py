@@ -461,6 +461,18 @@ def get_company_by_email(db: Session, email: str):
 # ++++++++++++++++++ FEE SERVICE LAYER +++++++++++++++++++++++++++++++++++++++++++
 def create_fee_config(db: Session, data: FeeConfigCreate, user: User) -> FeeConfig:
 
+    existing = db.query(FeeConfig).filter(
+        FeeConfig.company_id == data.company_id,
+        FeeConfig.destination_country_id == data.destination_country_id,
+        FeeConfig.transaction_type == data.transaction_type,
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Fee config already exists. Use update instead."
+        )
+
     # EXCLUDE tiers from constructor
     config_data = data.model_dump(exclude={"tiers"})
 
@@ -505,12 +517,10 @@ def update_or_version_fee_config(
     # ==========================
     if config.status == "PENDING":
 
-        # Update scalar fields
         for field, value in data.model_dump(exclude_unset=True).items():
             if field != "tiers":
                 setattr(config, field, value)
 
-        # Replace tiers completely (explicit DB control)
         if data.tiers is not None:
             db.query(FeeTier).filter(
                 FeeTier.fee_config_id == config.id
@@ -533,9 +543,8 @@ def update_or_version_fee_config(
     # ==========================
     if config.status == "APPROVED":
 
-        # deactivate old config
-        config.is_active = False
-
+        # DO NOT TOUCH OLD CONFIG
+        # Leave it APPROVED + is_active=True
         new_config = FeeConfig(
             transaction_type=config.transaction_type,
             destination_country_id=config.destination_country_id,
@@ -550,7 +559,7 @@ def update_or_version_fee_config(
         db.add(new_config)
         db.flush()
 
-        # If new tiers provided → use them
+        # Use provided tiers
         if data.tiers is not None:
             for tier_data in data.tiers:
                 db.add(
@@ -560,7 +569,7 @@ def update_or_version_fee_config(
                     )
                 )
         else:
-            # Otherwise clone existing tiers
+            # Clone existing tiers
             existing_tiers = db.query(FeeTier).filter(
                 FeeTier.fee_config_id == config.id
             ).all()
