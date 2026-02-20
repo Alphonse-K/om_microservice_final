@@ -9,7 +9,7 @@ from src.models.transaction import (
 )
 
 def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
-    # 1️⃣ Mark transaction as successful
+    # Mark transaction as successful
     transaction.status = "success"
     transaction.validated_at = datetime.now(timezone.utc)
 
@@ -18,7 +18,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
 
     transaction.gateway_response = email_obj.body
 
-    # 2️⃣ Load balance
+    # Load balance
     if not transaction.balance_id:
         raise ValueError(f"Transaction {transaction.id} has no balance_id")
 
@@ -28,11 +28,15 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
 
     transaction.before_balance = balance.available_balance
 
-    # 3️⃣ Apply money logic by transaction type
+    # Apply money logic by transaction type
     if isinstance(transaction, (DepositTransaction, AirtimePurchase)):
         # Debit-type: consume held
-        balance.held_balance -= transaction.amount
-        balance.available_balance -= transaction.amount
+        total_debit = transaction.amount + transaction.fee_amount
+        balance.held_balance -= total_debit
+        balance.available_balance -= total_debit
+
+        # balance.held_balance -= transaction.amount
+        # balance.available_balance -= transaction.amount
 
     elif isinstance(transaction, WithdrawalTransaction):
         # Credit-type: directly increase available
@@ -43,7 +47,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
 
     transaction.after_balance = balance.available_balance
 
-    # 4️⃣ Commit
+    # Commit
     db.commit()
     db.refresh(transaction)
 

@@ -17,6 +17,7 @@ from src.models.transaction import (
     CompanyCountryBalance,
     Company,
     FeeConfig,
+    FeeTier
 )
 
 # SCHEMAS
@@ -30,6 +31,8 @@ from src.schemas.transaction import (
     CompanyUpdate,
     FeeConfigCreate,
     FeeConfigUpdate,
+    FeeTierCreate,
+    FeeTierUpdate,
 )
 
 
@@ -454,119 +457,154 @@ def get_company_by_email(db: Session, email: str):
     """Get company by email"""
     return db.query(Company).filter(Company.email == email).first()
 
+
 # ++++++++++++++++++ FEE SERVICE LAYER +++++++++++++++++++++++++++++++++++++++++++
+def create_fee_config(db: Session, data: FeeConfigCreate, user: User) -> FeeConfig:
 
-def create_fee_config(db: Session, data: FeeConfigCreate, user: User):
+    # EXCLUDE tiers from constructor
+    config_data = data.model_dump(exclude={"tiers"})
+
     config = FeeConfig(
-        **data.model_dump(),
-        created_by=user.id,
+        **config_data,
+        version=1,
         status="PENDING",
+        is_active=False,
+        created_by=user.id,
     )
+
     db.add(config)
-    db.commit()
-    db.refresh(config)
-    return config
+    db.flush()  # get config.id
 
-
-def list_fee_configs(db: Session):
-    return db.query(FeeConfig).all()
-
-def get_fee_config(db: Session, config_id: int):
-    return db.query(FeeConfig).filter(FeeConfig.id == config_id).first()
-
-def update_fee_config(db: Session, config_id: int, data: FeeConfigUpdate):
-    config = get_fee_config(db, config_id)
-    if not config:
-        return None
-
-    if config.status == "APPROVED":
-        raise ValueError("Approved fee configs cannot be updated")
-
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(config, key, value)
+    # Now manually create tiers
+    for tier_data in data.tiers:
+        tier = FeeTier(
+            **tier_data.model_dump(),
+            fee_config_id=config.id,
+        )
+        db.add(tier)
 
     db.commit()
     db.refresh(config)
+
     return config
 
 def update_or_version_fee_config(
     db: Session,
     config_id: int,
     data: FeeConfigUpdate,
-    current_user: User
+    current_user: User,
 ) -> FeeConfig:
 
     config = db.query(FeeConfig).filter(FeeConfig.id == config_id).first()
+
     if not config:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Fee config not found")
 
     # ==========================
-    # CASE 1: PENDING → update in place
+    # CASE 1 → PENDING
     # ==========================
     if config.status == "PENDING":
+
+        # Update scalar fields
         for field, value in data.model_dump(exclude_unset=True).items():
-            setattr(config, field, value)
+            if field != "tiers":
+                setattr(config, field, value)
+
+        # Replace tiers completely (explicit DB control)
+        if data.tiers is not None:
+            db.query(FeeTier).filter(
+                FeeTier.fee_config_id == config.id
+            ).delete()
+
+            for tier_data in data.tiers:
+                db.add(
+                    FeeTier(
+                        fee_config_id=config.id,
+                        **tier_data.model_dump()
+                    )
+                )
 
         db.commit()
         db.refresh(config)
         return config
 
     # ==========================
-    # CASE 2: APPROVED → VERSION IT
+    # CASE 2 → APPROVED → VERSION
     # ==========================
     if config.status == "APPROVED":
 
-        # Safety: only one active config
+        # deactivate old config
         config.is_active = False
 
         new_config = FeeConfig(
             transaction_type=config.transaction_type,
             destination_country_id=config.destination_country_id,
-
-            fee_type=data.fee_type if data.fee_type is not None else config.fee_type,
-            flat_fee=data.flat_fee if data.flat_fee is not None else config.flat_fee,
-            percent_fee=data.percent_fee if data.percent_fee is not None else config.percent_fee,
-            min_fee=data.min_fee if data.min_fee is not None else config.min_fee,
-            max_fee=data.max_fee if data.max_fee is not None else config.max_fee,
-
+            company_id=config.company_id,
             version=config.version + 1,
             previous_config_id=config.id,
-
             status="PENDING",
             is_active=False,
             created_by=current_user.id,
-            created_at=datetime.now(timezone.utc)
         )
 
         db.add(new_config)
+        db.flush()
+
+        # If new tiers provided → use them
+        if data.tiers is not None:
+            for tier_data in data.tiers:
+                db.add(
+                    FeeTier(
+                        fee_config_id=new_config.id,
+                        **tier_data.model_dump()
+                    )
+                )
+        else:
+            # Otherwise clone existing tiers
+            existing_tiers = db.query(FeeTier).filter(
+                FeeTier.fee_config_id == config.id
+            ).all()
+
+            for tier in existing_tiers:
+                db.add(
+                    FeeTier(
+                        fee_config_id=new_config.id,
+                        min_amount=tier.min_amount,
+                        max_amount=tier.max_amount,
+                        fee_type=tier.fee_type,
+                        flat_fee=tier.flat_fee,
+                        percent_fee=tier.percent_fee,
+                    )
+                )
+
         db.commit()
         db.refresh(new_config)
         return new_config
 
-    # ==========================
-    # CASE 3: Invalid state
-    # ==========================
     raise HTTPException(
         status.HTTP_400_BAD_REQUEST,
-        f"Cannot update fee config with status {config.status}"
+        f"Cannot update fee config with status {config.status}",
     )
 
-def approve_fee_config(db: Session, config_id: int, user: User):
-    config = get_fee_config(db, config_id)
+def approve_fee_config(db: Session, config_id: int, user: User) -> FeeConfig:
+
+    config = db.query(FeeConfig).filter(FeeConfig.id == config_id).first()
+
     if not config:
-        raise ValueError("Fee config not found")
+        raise HTTPException(404, "Fee config not found")
 
     if user.role not in ["CHECKER", "ADMIN"]:
-        raise PermissionError("Only CHECKER or ADMIN can approve")
+        raise HTTPException(403, "Not authorized to approve")
 
     if config.status == "APPROVED":
-        raise ValueError("Already approved")
+        raise HTTPException(400, "Already approved")
 
-    # deactivate previous active config
+    # Deactivate existing active config for same rule
     db.query(FeeConfig).filter(
+        FeeConfig.company_id == config.company_id,
         FeeConfig.destination_country_id == config.destination_country_id,
         FeeConfig.transaction_type == config.transaction_type,
-        FeeConfig.is_active == True
+        FeeConfig.is_active == True,
     ).update({"is_active": False})
 
     config.status = "APPROVED"
@@ -577,3 +615,10 @@ def approve_fee_config(db: Session, config_id: int, user: User):
     db.commit()
     db.refresh(config)
     return config
+
+def list_fee_configs(db: Session):
+    return db.query(FeeConfig).all()
+
+def get_fee_config(db: Session, config_id: int):
+    return db.query(FeeConfig).filter(FeeConfig.id == config_id).first()
+
