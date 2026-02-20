@@ -187,8 +187,6 @@ def process_transaction_queue(self):
                         destination_country.id,
                         held_amount
                     )
-                    # held_amount = amount_decimal
-                    # balance_manager.hold_balance(db, company_id, destination_country.id, held_amount)
 
                 tx_data = {
                     "company_id": company_id,
@@ -203,8 +201,8 @@ def process_transaction_queue(self):
                     "status": "initiated",
                     "fee_amount": fee_info["fee_amount"],
                     "net_amount": amount_decimal,
-                    "before_balance": balance.available_balance + balance.held_balance,
-                    "after_balance": balance.available_balance + balance.held_balance,
+                    "before_balance": balance.available_balance,
+                    "after_balance": balance.available_balance,
                 }
 
                 # Convert amount to int for gateway

@@ -41,7 +41,7 @@ def confirm_transaction(db: Session, transaction, parsed_data, email_obj):
     elif isinstance(transaction, WithdrawalTransaction):
         # Credit-type: directly increase available
         balance.available_balance += transaction.amount
-
+        balance.available_balance -= transaction.fee_amount
     else:
         raise ValueError(f"Unsupported transaction type {type(transaction)}")
 
