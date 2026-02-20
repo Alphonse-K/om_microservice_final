@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator, model_validator
 from typing import List, Any, Dict
 
 from src.models.transaction import TransactionType 
@@ -295,15 +295,19 @@ class CompanyBalanceResponse(CompanyBalanceBase):
             }
         }
     )
+
+
 class UserBase(BaseModel):
     name: str
     email: EmailStr
     role: str
     is_active: bool = True
 
+
 class UserCreate(UserBase):
     company_id: int
     password: str
+
 
 class UserUpdate(BaseModel):
     name: Optional[str]
@@ -311,6 +315,7 @@ class UserUpdate(BaseModel):
     role: Optional[str]
     is_active: Optional[bool]
     company_id: Optional[int]
+
 
 class UserResponse(BaseModel):
     id: int
@@ -324,92 +329,112 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class FeeConfigBase(BaseModel):
-    transaction_type: TransactionType = Field(
-        ..., description="Type of transaction (e.g., CASH_IN, CASH_OUT)"
-    )
+class FeeTierBase(BaseModel):
+    min_amount: Decimal = Field(..., example="0.00")
+    max_amount: Decimal = Field(..., example="1000.00")
 
-    destination_country_id: int = Field(
-        ..., example=2, description="ID of the destination/receiving country"
-    )
-
-    company_id: int = Field(..., example=2, description="ID Of the company for which the fee is configured")
-
-    fee_type: str = Field(
-        ..., example="percent", description="Either 'flat' or 'percent'"
-    )
-
-    flat_fee: Decimal = Field(
-        ..., example="5.00", description="Flat fee applied when fee_type='flat'"
-    )
-    percent_fee: Decimal = Field(
-        ..., example="1.50", description="Percent fee when fee_type='percent'"
-    )
-
-    min_fee: Decimal = Field(
-        ..., example="0.50", description="Minimum fee allowed"
-    )
-    max_fee: Optional[Decimal] = Field(
-        ..., example="10.00", description="Maximum fee allowed"
-    )
-
-    is_active: bool = Field(
-        ..., example=True, description="Whether this fee configuration is active"
-    )
+    fee_type: str = Field(..., example="percent")  # flat, percent, mixed
+    flat_fee: Decimal = Field(default=Decimal("0"))
+    percent_fee: Decimal = Field(default=Decimal("0"))
 
     # ---------------- VALIDATORS ---------------- #
 
-    @field_validator("percent_fee")
-    def validate_percent_fee(cls, v: Decimal) -> Decimal:
-        if v < 0 or v > 100:
-            raise ValueError("Percent fee must be between 0 and 100")
-        return v
-
-    @field_validator("max_fee", mode="before")
-    def validate_max_fee(cls, v: Any) -> Optional[Decimal]:
-        """
-        Fix corrupted max_fee values (some DB rows may contain invalid strings)
-        """
-        if v is not None and isinstance(v, str) and len(v) > 50:
-            return None
-        return v
-    
     @field_validator("fee_type")
-    def validate_fee_type(cls, v: str) -> str:
+    def validate_fee_type(cls, v: str):
         allowed = {"flat", "percent", "mixed"}
         if v not in allowed:
             raise ValueError(f"fee_type must be one of {allowed}")
         return v
 
+    @model_validator(mode="after")
+    def validate_fee_logic(self):
+        if self.min_amount < 0:
+            raise ValueError("min_amount cannot be negative")
 
-class FeeConfigCreate(FeeConfigBase):
+        if self.max_amount <= self.min_amount:
+            raise ValueError("max_amount must be greater than min_amount")
+
+        if self.fee_type == "flat":
+            if self.percent_fee != 0:
+                raise ValueError("percent_fee must be 0 when fee_type='flat'")
+
+        if self.fee_type == "percent":
+            if self.flat_fee != 0:
+                raise ValueError("flat_fee must be 0 when fee_type='percent'")
+            if not (0 <= self.percent_fee <= 100):
+                raise ValueError("percent_fee must be between 0 and 100")
+
+        if self.fee_type == "mixed":
+            if self.flat_fee <= 0 and self.percent_fee <= 0:
+                raise ValueError("mixed fee must have flat or percent > 0")
+
+        return self
+
+
+class FeeTierCreate(FeeTierBase):
     pass
 
-class FeeConfigUpdate(BaseModel):
+
+class FeeTierUpdate(BaseModel):
+    min_amount: Optional[Decimal] = None
+    max_amount: Optional[Decimal] = None
     fee_type: Optional[str] = None
     flat_fee: Optional[Decimal] = None
     percent_fee: Optional[Decimal] = None
-    min_fee: Optional[Decimal] = None
-    max_fee: Optional[Decimal] = None
+
+
+class FeeTierResponse(FeeTierBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FeeConfigBase(BaseModel):
+    transaction_type: TransactionType
+    destination_country_id: int
+    company_id: int
+
+
+class FeeConfigCreate(FeeConfigBase):
+    tiers: List[FeeTierCreate]
+
+    @model_validator(mode="after")
+    def validate_no_overlap(self):
+        sorted_tiers = sorted(self.tiers, key=lambda t: t.min_amount)
+
+        for i in range(len(sorted_tiers) - 1):
+            current = sorted_tiers[i]
+            next_tier = sorted_tiers[i + 1]
+
+            if current.max_amount > next_tier.min_amount:
+                raise ValueError("Fee tiers cannot overlap")
+
+        return self
+
+
+class FeeConfigUpdate(BaseModel):
+    transaction_type: Optional[TransactionType] = None
+    destination_country_id: Optional[int] = None
+    company_id: Optional[int] = None
+    status: Optional[str] = None
     is_active: Optional[bool] = None
+
+    # Replace tiers completely
+    tiers: Optional[List[FeeTierCreate]] = None
+
 
 class FeeConfigResponse(BaseModel):
     id: int
     transaction_type: TransactionType
     destination_country_id: int
     company_id: int
-    fee_type: str
-    flat_fee: Decimal
-    percent_fee: Decimal
-    min_fee: Decimal
-    max_fee: Optional[Decimal]
+    version: int
     status: str
     is_active: bool
     created_by: int
-    approved_by: int | None
-    approved_at: datetime | None
+    approved_by: Optional[int]
+    approved_at: Optional[datetime]
     created_at: datetime
-
+    tiers: List[FeeTierResponse]
     model_config = ConfigDict(from_attributes=True)
 
 

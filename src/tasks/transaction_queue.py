@@ -41,7 +41,6 @@ class BalanceManager:
         if balance.available_balance < amount:
             raise Exception(f"Insufficient available balance. Available: {balance.available_balance}, Required: {amount}")
 
-        # balance.available_balance -= amount
         balance.held_balance += amount
         db.add(balance)
         db.commit()
@@ -71,31 +70,34 @@ class BalanceManager:
 
 # ----------------- FEE CALCULATOR ----------------- #
 class FeeCalculator:
+
     @staticmethod
-    def calculate_fee(db: Session, destination_country_id: int, transaction_type, amount: Decimal) -> dict:
-        fee_config: FeeConfig = db.query(FeeConfig).filter(
+    def calculate_fee(db, company_id, destination_country_id, transaction_type, amount):
+        config = db.query(FeeConfig).filter(
+            FeeConfig.company_id == company_id,
             FeeConfig.destination_country_id == destination_country_id,
             FeeConfig.transaction_type == transaction_type,
             FeeConfig.is_active == True
         ).first()
 
-        if not fee_config:
-            return {"fee_amount": Decimal('0'), "net_amount": amount}
+        if not config:
+            return {"fee_amount": Decimal("0")}
 
-        if fee_config.fee_type == "flat":
-            fee_amount = Decimal(fee_config.flat_fee)
-        elif fee_config.fee_type == "percent":
-            fee_amount = (amount * Decimal(fee_config.percent_fee)) / Decimal('100')
+        tier = next(
+            (t for t in config.tiers
+            if t.min_amount <= amount <= t.max_amount),
+            None
+        )
+
+        if not tier:
+            return {"fee_amount": Decimal("0")}
+
+        if tier.fee_type == "flat":
+            fee = Decimal(tier.flat_fee)
         else:
-            fee_amount = Decimal('0')
+            fee = (amount * Decimal(tier.percent_fee)) / Decimal("100")
 
-        if fee_config.min_fee and fee_amount < Decimal(fee_config.min_fee):
-            fee_amount = Decimal(fee_config.min_fee)
-        if fee_config.max_fee and fee_amount > Decimal(fee_config.max_fee):
-            fee_amount = Decimal(fee_config.max_fee)
-
-        return {"fee_amount": fee_amount, "net_amount": amount - fee_amount}
-
+        return {"fee_amount": fee}
 
 # ----------------- COUNTRY ROUTER ----------------- #
 class CountryRouter:
@@ -176,8 +178,17 @@ def process_transaction_queue(self):
 
                 # Hold full amount only for debit-type transactions
                 if req_type in ("cashin", "airtime"):
-                    held_amount = amount_decimal
-                    balance_manager.hold_balance(db, company_id, destination_country.id, held_amount)
+                    total_debit = amount_decimal + fee_info["fee_amount"]
+                    held_amount = total_debit
+
+                    balance_manager.hold_balance(
+                        db,
+                        company_id,
+                        destination_country.id,
+                        held_amount
+                    )
+                    # held_amount = amount_decimal
+                    # balance_manager.hold_balance(db, company_id, destination_country.id, held_amount)
 
                 tx_data = {
                     "company_id": company_id,

@@ -531,13 +531,62 @@ def list_all_balances(
     balances = FinanceService.get_all_company_balances(db, current_user.company_id)
     return balances
 
-@fee_router.post("/", response_model=FeeConfigResponse)
-def create(
-    data: FeeConfigCreate, 
+@fee_router.post(
+    "/{config_id}/tiers",
+    response_model=FeeTierResponse
+)
+def create_tier(
+    config_id: int,
+    payload: FeeTierCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["MAKER", "ADMIN"]))
 ):
-    return create_fee_config(db, data, current_user)
+    return add_fee_tier(db, config_id, payload)
+
+@fee_router.put(
+    "/{config_id}/tiers/{tier_id}",
+    response_model=FeeTierResponse
+)
+def update_tier(
+    config_id: int,
+    tier_id: int,
+    payload: FeeTierUpdate,
+    db: Session = Depends(get_db),
+):
+    return update_fee_tier(db, config_id, tier_id, payload)
+
+@fee_router.delete("/{config_id}/tiers/{tier_id}")
+def remove_tier(
+    config_id: int,
+    tier_id: int,
+    db: Session = Depends(get_db),
+):
+    delete_fee_tier(db, config_id, tier_id)
+    return {"detail": "Tier deleted"}
+
+@fee_router.post("/", response_model=FeeConfigResponse)
+def create_fee(
+    payload: FeeConfigCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role(["MAKER", "ADMIN"]))
+):
+    return create_fee_config(db, payload, user)
+
+@fee_router.put("/{config_id}", response_model=FeeConfigResponse)
+def update_fee(
+    config_id: int,
+    payload: FeeConfigUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_role(["MAKER", "ADMIN"]))
+):
+    return update_or_version_fee_config(db, config_id, payload, user)
+
+@fee_router.post("/{config_id}/approve", response_model=FeeConfigResponse)
+def approve_fee(
+    config_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_role(["CHECKER", "ADMIN"]))
+):
+    return approve_fee_config(db, config_id, user)
 
 @fee_router.get("/", response_model=list[FeeConfigResponse])
 def list_all(db: Session = Depends(get_db)):
@@ -549,36 +598,6 @@ def retrieve_one(config_id: int, db: Session = Depends(get_db)):
     if not config:
         raise HTTPException(404, "Fee config not found")
     return config
-
-@fee_router.put("/{config_id}", response_model=FeeConfigResponse)
-def update(
-    config_id: int,
-    data: FeeConfigUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["MAKER", "ADMIN"]))
-):
-    try:
-        return update_or_version_fee_config(
-            db=db,
-            config_id=config_id,
-            data=data,
-            current_user=current_user
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@fee_router.post("/{config_id}/approve", response_model=FeeConfigResponse)
-def approve(
-    config_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role(["CHECKER", "ADMIN"]))
-):
-    try:
-        return approve_fee_config(db, config_id, current_user)
-    except PermissionError as e:
-        raise HTTPException(403, str(e))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
 
 
 @procurement_router.post("/", response_model=ProcurementResponse)

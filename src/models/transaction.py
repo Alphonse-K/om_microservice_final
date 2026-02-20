@@ -234,7 +234,7 @@ class CompanyCountryBalance(Base):
 class FeeConfig(Base):
     __tablename__ = "fee_configs"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
 
     transaction_type = Column(
         SAEnum(TransactionType, name="transaction_type_enum"),
@@ -248,20 +248,11 @@ class FeeConfig(Base):
     )
 
     company_id = Column(
-            Integer,
-            ForeignKey("companies.id"),
-            nullable=False,
-            index=True
+        Integer,
+        ForeignKey("companies.id"),
+        nullable=False,
+        index=True
     )
-
-    # ==========================
-    # Fee calculation
-    # ==========================
-    fee_type = Column(String(20), nullable=False)  # flat, percent, mixed
-    flat_fee = Column(Numeric(10, 6), default=0)
-    percent_fee = Column(Numeric(10, 6), default=0)
-    min_fee = Column(Numeric(10, 6), default=0)
-    max_fee = Column(Numeric(10, 6), nullable=True)
 
     # ==========================
     # Versioning
@@ -291,22 +282,52 @@ class FeeConfig(Base):
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # ==========================
+    # Relationships
+    # ==========================
     destination_country = relationship(
         "Country",
         foreign_keys=[destination_country_id],
         back_populates="fee_configs_destination"
     )
 
-    company = relationship("Company", back_populates="fee_configs")
+    company = relationship(
+        "Company",
+        back_populates="fee_configs"
+    )
+
+    tiers = relationship(
+        "FeeTier",
+        back_populates="fee_config",
+        cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
-            UniqueConstraint(
-                "company_id",
-                "transaction_type",
-                "destination_country_id",
-                "is_active",
-                name="uix_fee_active_rule"
-            ),
+        UniqueConstraint(
+            "company_id",
+            "transaction_type",
+            "destination_country_id",
+            "is_active",
+            name="uix_fee_active_rule"
+        ),
+    )
+
+class FeeTier(Base):
+    __tablename__ = "fee_tiers"
+    id = Column(Integer, primary_key=True)
+    fee_config_id = Column(
+        Integer,
+        ForeignKey("fee_configs.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    min_amount = Column(Numeric(14, 2), nullable=False)
+    max_amount = Column(Numeric(14, 2), nullable=False)
+    fee_type = Column(String(20), nullable=False)  # flat or percent
+    flat_fee = Column(Numeric(10, 6), default=0)
+    percent_fee = Column(Numeric(10, 6), default=0)
+    fee_config = relationship(
+        "FeeConfig",
+        back_populates="tiers"
     )
 
 
