@@ -171,6 +171,7 @@ def process_transaction_queue(self):
                 # Calculate fees
                 fee_info = fee_calculator.calculate_fee(
                     db,
+                    company_id,
                     destination_country_id=destination_country.id,
                     transaction_type=req_type,
                     amount=amount_decimal
