@@ -531,37 +531,37 @@ def list_all_balances(
     balances = FinanceService.get_all_company_balances(db, current_user.company_id)
     return balances
 
-@fee_router.post(
-    "/{config_id}/tiers",
-    response_model=FeeTierResponse
-)
-def create_tier(
-    config_id: int,
-    payload: FeeTierCreate,
-    db: Session = Depends(get_db),
-):
-    return add_fee_tier(db, config_id, payload)
+# @fee_router.post(
+#     "/{config_id}/tiers",
+#     response_model=FeeTierResponse
+# )
+# def create_tier(
+#     config_id: int,
+#     payload: FeeTierCreate,
+#     db: Session = Depends(get_db),
+# ):
+#     return add_fee_tier(db, config_id, payload)
 
-@fee_router.put(
-    "/{config_id}/tiers/{tier_id}",
-    response_model=FeeTierResponse
-)
-def update_tier(
-    config_id: int,
-    tier_id: int,
-    payload: FeeTierUpdate,
-    db: Session = Depends(get_db),
-):
-    return update_fee_tier(db, config_id, tier_id, payload)
+# @fee_router.put(
+#     "/{config_id}/tiers/{tier_id}",
+#     response_model=FeeTierResponse
+# )
+# def update_tier(
+#     config_id: int,
+#     tier_id: int,
+#     payload: FeeTierUpdate,
+#     db: Session = Depends(get_db),
+# ):
+#     return update_fee_tier(db, config_id, tier_id, payload)
 
-@fee_router.delete("/{config_id}/tiers/{tier_id}")
-def remove_tier(
-    config_id: int,
-    tier_id: int,
-    db: Session = Depends(get_db),
-):
-    delete_fee_tier(db, config_id, tier_id)
-    return {"detail": "Tier deleted"}
+# @fee_router.delete("/{config_id}/tiers/{tier_id}")
+# def remove_tier(
+#     config_id: int,
+#     tier_id: int,
+#     db: Session = Depends(get_db),
+# ):
+#     delete_fee_tier(db, config_id, tier_id)
+#     return {"detail": "Tier deleted"}
 
 @fee_router.post("/", response_model=FeeConfigResponse)
 def create_fee(
